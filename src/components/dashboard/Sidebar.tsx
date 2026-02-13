@@ -34,12 +34,12 @@ export function Sidebar({
   const pathname = usePathname();
 
   return (
-    <aside className="w-56 border-r border-[var(--zychad-border)] bg-[var(--zychad-surface)]/50 min-h-screen flex flex-col">
-      <div className="p-5 border-b border-[var(--zychad-border)]">
+    <aside className="w-56 border-r border-[var(--br)] bg-[var(--s1)] min-h-screen flex flex-col">
+      <div className="p-5 border-b border-[var(--br)]">
         <Link href="/dashboard" className="text-lg font-bold text-[var(--zychad-teal-bright)] flex items-center gap-2 hover:opacity-90 transition">
           <span className="text-xl">⚡</span> ZyChad Meta
         </Link>
-        <span className="inline-block mt-3 text-xs px-2.5 py-1 rounded-lg bg-[var(--zychad-teal)]/10 text-[var(--zychad-teal-bright)] border border-[var(--zychad-teal)]/20">
+        <span className="inline-block mt-3 text-xs px-2.5 py-1 rounded-md bg-[rgba(14,165,199,.06)] text-[var(--zychad-teal-bright)] border border-[rgba(14,165,199,.15)]">
           {plan}
         </span>
       </div>
@@ -54,8 +54,8 @@ export function Sidebar({
               className={cn(
                 "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors",
                 active
-                  ? "bg-[var(--zychad-teal)]/20 text-[var(--zychad-teal-bright)]"
-                  : "text-[var(--zychad-dim)] hover:bg-[var(--zychad-border)]/50 hover:text-[var(--zychad-text)]"
+                  ? "bg-[var(--s3)] text-[var(--zychad-teal-bright)]"
+                  : "text-[var(--zychad-dim)] hover:bg-[rgba(255,255,255,.04)] hover:text-[var(--zychad-text)]"
               )}
             >
               <Icon className="w-4 h-4" />
@@ -68,17 +68,16 @@ export function Sidebar({
           target="_blank"
           rel="noopener noreferrer"
           className={cn(
-            "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors mt-2",
-            "bg-gradient-to-r from-[var(--zychad-teal)]/20 to-[var(--zychad-teal)]/10",
-            "text-[var(--zychad-teal-bright)] hover:from-[var(--zychad-teal)]/30 hover:to-[var(--zychad-teal)]/15",
-            "border border-[var(--zychad-teal)]/30"
+            "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors mt-2",
+            "bg-[rgba(14,165,199,.06)] border border-[rgba(14,165,199,.15)]",
+            "text-[var(--zychad-teal-bright)] hover:bg-[rgba(14,165,199,.1)] hover:border-[rgba(14,165,199,.25)]"
           )}
         >
           <Bot className="w-4 h-4" />
           Accéder au bot
         </a>
       </nav>
-      <div className="p-4 border-t border-[var(--zychad-border)] flex items-center gap-3">
+      <div className="p-4 border-t border-[var(--br)] flex items-center gap-3">
         {userImage ? (
           <img src={userImage} alt="" className="w-9 h-9 rounded-xl object-cover" />
         ) : (

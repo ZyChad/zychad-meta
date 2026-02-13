@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Sora:wght@400;500;600;700;800&family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -6,16 +6,17 @@
 
 @layer base {
   :root {
-    /* Design system ZyChad Meta */
-    --bg: #050a0e;
-    --s1: #091a22;
-    --s2: #0c222e;
-    --s3: #102a38;
+    /* Charte graphique bot ZyChad Meta (alignée avec zychad_metaV15.py) */
+    --bg: #091a22;
+    --s1: #0c222e;
+    --s2: #102a38;
+    --s3: #143345;
     --s4: #143345;
     --teal: #0ea5c7;
     --t2: #06b6d4;
     --t3: #22d3ee;
     --t4: #67e8f9;
+    --teald: #0891b2;
     --txt: #e8f4f8;
     --dim: #7eb3c7;
     --mut: #4a7a8f;
@@ -23,7 +24,8 @@
     --red: #f87171;
     --ylw: #fbbf24;
     --prp: #a78bfa;
-    --br: rgba(20,51,69,.4);
+    --br: rgba(255,255,255,.08);
+    --br2: rgba(255,255,255,.12);
     /* v5 LP aliases */
     --tl: #0ea5c7;
     --tx: #e8f4f8;
@@ -33,15 +35,15 @@
     --rd: #f87171;
     --yl: #fbbf24;
     --pr: #a78bfa;
-    --zychad-bg: #050a0e;
-    --zychad-surface: #091a22;
+    --zychad-bg: #091a22;
+    --zychad-surface: #0c222e;
     --zychad-teal: #0ea5c7;
     --zychad-teal-bright: #22d3ee;
     --zychad-text: #e8f4f8;
     --zychad-dim: #7eb3c7;
     --zychad-green: #34d399;
     --zychad-red: #f87171;
-    --zychad-border: #143345;
+    --zychad-border: rgba(255,255,255,.08);
     --background: 192 100% 4%;
     --foreground: 195 50% 95%;
     --card: 195 40% 6%;
@@ -70,7 +72,7 @@ html {
 
 body {
   @apply bg-[var(--zychad-bg)] text-[var(--zychad-text)] antialiased;
-  font-family: 'Outfit', system-ui, sans-serif;
+  font-family: 'DM Sans', 'Outfit', system-ui, sans-serif;
   line-height: 1.6;
   overflow-x: hidden;
 }

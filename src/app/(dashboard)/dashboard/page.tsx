@@ -20,13 +20,14 @@ export default async function DashboardOverviewPage() {
 
   return (
     <div className="min-h-screen relative overflow-hidden">
-      {/* Gradient background (style LP) */}
+      {/* Gradient background (aligné bot) */}
       <div className="absolute inset-0 pointer-events-none -z-10">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[600px] bg-[radial-gradient(ellipse_at_top,rgba(14,165,199,0.08)_0%,transparent_60%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_20%_0%,rgba(14,165,199,.06)_0%,transparent_60%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_80%_100%,rgba(6,182,212,.04)_0%,transparent_50%)]" />
       </div>
 
       <div className="p-8 md:p-12 max-w-4xl mx-auto">
-        <h1 className="text-3xl md:text-4xl font-bold text-[var(--zychad-text)] mb-2 tracking-tight">
+        <h1 className="text-3xl md:text-4xl font-bold text-[var(--zychad-text)] mb-2 tracking-tight" style={{ fontFamily: "'Sora', sans-serif" }}>
           Tableau de bord
         </h1>
         <p className="text-xs text-[var(--zychad-dim)] mb-4">v2 • Accède au bot pour uniquifier</p>
@@ -35,22 +36,22 @@ export default async function DashboardOverviewPage() {
         </p>
 
         <div className="grid gap-4 md:grid-cols-3 mb-10">
-          <div className="p-5 rounded-2xl border border-[var(--zychad-border)] bg-[var(--zychad-surface)]/80 backdrop-blur-sm">
+          <div className="p-5 rounded-xl border border-[var(--br)] bg-[var(--s1)]">
             <p className="text-xs uppercase tracking-wider text-[var(--zychad-dim)] mb-1">Plan</p>
             <p className="text-2xl font-bold text-[var(--zychad-teal-bright)]">{user?.plan ?? "FREE"}</p>
           </div>
-          <div className="p-5 rounded-2xl border border-[var(--zychad-border)] bg-[var(--zychad-surface)]/80 backdrop-blur-sm">
+          <div className="p-5 rounded-xl border border-[var(--br)] bg-[var(--s1)]">
             <p className="text-xs uppercase tracking-wider text-[var(--zychad-dim)] mb-1">Fichiers traités</p>
             <p className="text-2xl font-bold text-[var(--zychad-text)]">{user?.filesProcessedTotal ?? 0}</p>
           </div>
-          <div className="p-5 rounded-2xl border border-[var(--zychad-border)] bg-[var(--zychad-surface)]/80 backdrop-blur-sm">
+          <div className="p-5 rounded-xl border border-[var(--br)] bg-[var(--s1)]">
             <p className="text-xs uppercase tracking-wider text-[var(--zychad-dim)] mb-1">Ce mois</p>
             <p className="text-2xl font-bold text-[var(--zychad-text)]">{user?.filesProcessedThisMonth ?? 0}</p>
           </div>
         </div>
 
-        <div className="rounded-2xl border border-[var(--zychad-border)] bg-[var(--zychad-surface)]/80 backdrop-blur-sm p-8 md:p-10 text-center">
-          <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-[var(--zychad-teal)]/30 to-[var(--zychad-teal)]/10 flex items-center justify-center">
+        <div className="rounded-xl border border-[var(--br)] bg-[var(--s1)] p-8 md:p-10 text-center">
+          <div className="w-16 h-16 mx-auto mb-6 rounded-xl bg-[rgba(14,165,199,.06)] border border-[rgba(14,165,199,.15)] flex items-center justify-center">
             <span className="text-3xl">⚡</span>
           </div>
           <h2 className="text-xl font-semibold text-[var(--zychad-text)] mb-2">
@@ -63,7 +64,7 @@ export default async function DashboardOverviewPage() {
             href={botUrl || "/app/"}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-gradient-to-r from-[var(--zychad-teal)] to-[#0891b2] text-white font-semibold shadow-[0_6px_30px_rgba(14,165,199,0.35)] hover:shadow-[0_12px_44px_rgba(14,165,199,0.45)] hover:-translate-y-0.5 transition-all"
+            className="inline-flex items-center gap-2 px-8 py-4 rounded-lg bg-[var(--teal)] text-white font-semibold hover:bg-[var(--t2)] hover:shadow-[0_4px_20px_rgba(14,165,199,.25)] transition-all"
           >
             ⚡ Accéder au bot
           </a>
