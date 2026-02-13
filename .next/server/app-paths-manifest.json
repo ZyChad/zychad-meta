@@ -1,0 +1,11 @@
+{
+  "/app/page": "app/app/page.js",
+  "/billing/page": "app/billing/page.js",
+  "/(marketing)/page": "app/(marketing)/page.js",
+  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
+  "/conditions/page": "app/conditions/page.js",
+  "/confidentialite/page": "app/confidentialite/page.js",
+  "/remboursement/page": "app/remboursement/page.js",
+  "/contact/page": "app/contact/page.js",
+  "/(auth)/login/page": "app/(auth)/login/page.js"
+}
