@@ -59,8 +59,28 @@ export async function middleware(req: NextRequest) {
   if (AUTH_PATHS.some((p) => pathname.startsWith(p))) {
     const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
     if (token?.sub) {
+      const redirectTo = req.nextUrl.searchParams.get("redirect");
+      const botUrl = process.env.NEXT_PUBLIC_BOT_URL ?? process.env.BOT_URL ?? "https://app.zychadmeta.com";
+      if (redirectTo && (redirectTo.startsWith(botUrl) || redirectTo.includes("app.zychadmeta.com"))) {
+        const target = redirectTo.replace(/\/$/, "") + "/";
+        return NextResponse.redirect(new URL("/api/auth/bot-token?redirect=" + encodeURIComponent(target), req.url));
+      }
       return NextResponse.redirect(new URL("/dashboard", req.url));
     }
+  }
+
+  // app.zychadmeta.com sur Vercel = requête mal routée, envoyer vers bot-token (sur www) pour obtenir un token
+  const host = req.headers.get("host") ?? "";
+  if (host.includes("app.zychadmeta.com")) {
+    if (req.nextUrl.searchParams.get("token")) return res;
+    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+    if (token?.sub) {
+      const botUrl = process.env.NEXT_PUBLIC_BOT_URL ?? process.env.BOT_URL ?? "https://app.zychadmeta.com";
+      const target = botUrl.replace(/\/$/, "") + "/";
+      const wwwBase = (process.env.NEXTAUTH_URL ?? `https://www.${host.replace("app.", "")}`).replace(/\/$/, "");
+      return NextResponse.redirect(new URL("/api/auth/bot-token?redirect=" + encodeURIComponent(target), wwwBase));
+    }
+    return res;
   }
 
   // Utilisateur connecté sur la LP → rediriger vers le dashboard
