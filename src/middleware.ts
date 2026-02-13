@@ -63,6 +63,14 @@ export async function middleware(req: NextRequest) {
     }
   }
 
+  // Utilisateur connecté sur la LP → rediriger vers le dashboard
+  if (pathname === "/") {
+    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+    if (token?.sub) {
+      return NextResponse.redirect(new URL("/dashboard", req.url));
+    }
+  }
+
   return res;
 }
 
