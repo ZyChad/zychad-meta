@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import Link from "next/link";
 
 export default async function AppPage() {
   const session = await getServerSession(authOptions);
@@ -10,7 +9,8 @@ export default async function AppPage() {
     redirect("/login?redirect=/app/");
   }
 
-  const botUrl = process.env.BOT_URL ?? "http://localhost:61550";
+  const botUrl = process.env.BOT_URL ?? process.env.NEXT_PUBLIC_BOT_URL;
+  const devBotUrl = process.env.BOT_URL ?? "http://localhost:61550";
 
   if (process.env.NODE_ENV === "development" && !process.env.USE_NGINX) {
     return (
@@ -24,7 +24,7 @@ export default async function AppPage() {
             En dev, lance le bot puis clique :
           </p>
             <a
-              href={botUrl}
+              href={devBotUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-block px-6 py-3 rounded-[10px] bg-[var(--teal)] text-[var(--bg)] font-medium hover:opacity-90"
@@ -42,7 +42,6 @@ export default async function AppPage() {
     );
   }
 
-  const botUrl = process.env.BOT_URL ?? process.env.NEXT_PUBLIC_BOT_URL;
   if (botUrl) {
     redirect(botUrl);
   }
