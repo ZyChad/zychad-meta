@@ -1,4 +1,4 @@
-import { redis } from "./redis";
+import { getRedis } from "./redis";
 
 const WINDOWS: Record<string, { windowSec: number; max: number }> = {
   "api:global": { windowSec: 60, max: 100 },
@@ -22,7 +22,7 @@ export async function rateLimit(
     const now = Math.floor(Date.now() / 1000);
     const windowStart = now - config.windowSec;
 
-    const multi = redis.multi();
+    const multi = getRedis().multi();
     multi.zremrangebyscore(fullKey, 0, windowStart);
     multi.zadd(fullKey, now, `${now}:${Math.random()}`);
     multi.zcard(fullKey);
@@ -37,7 +37,7 @@ export async function rateLimit(
     const success = count <= config.max;
 
     if (!success && results?.[1]) {
-      await redis.zrem(fullKey, (results[1] as [Error | null, string[]])[1]?.[0]);
+      await getRedis().zrem(fullKey, (results[1] as [Error | null, string[]])[1]?.[0]);
     }
 
     return { success, remaining };
