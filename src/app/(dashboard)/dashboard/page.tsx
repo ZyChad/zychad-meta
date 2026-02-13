@@ -29,6 +29,7 @@ export default async function DashboardOverviewPage() {
         <h1 className="text-3xl md:text-4xl font-bold text-[var(--zychad-text)] mb-2 tracking-tight">
           Tableau de bord
         </h1>
+        <p className="text-xs text-[var(--zychad-dim)] mb-4">v2 • Accède au bot pour uniquifier</p>
         <p className="text-[var(--zychad-dim)] mb-10">
           Bienvenue sur ZyChad Meta. Accède au bot pour uniquifier tes contenus.
         </p>

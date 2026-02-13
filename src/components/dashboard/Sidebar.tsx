@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+// v2 - Uniquifier/Scraper/Historique retirés, Accéder au bot ajouté
 const NAV = [
   { href: "/dashboard", label: "Accueil", icon: LayoutDashboard },
   { href: "/dashboard/billing", label: "Facturation", icon: CreditCard },
