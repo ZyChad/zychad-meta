@@ -106,7 +106,7 @@ export function BillingClient({
                   {price} €<span className="text-sm font-normal text-[var(--dim)]">/mois</span>
                 </p>
                 <ul className="mt-4 space-y-1 text-sm text-[var(--dim)]">
-                  {(p.features as string[]).slice(0, 3).map((f) => (
+                  {[...p.features].slice(0, 3).map((f) => (
                     <li key={f}>• {f}</li>
                   ))}
                 </ul>
