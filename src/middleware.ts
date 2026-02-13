@@ -5,7 +5,6 @@ import type { NextRequest } from "next/server";
 const PUBLIC_PATHS = ["/", "/login", "/register", "/forgot-password", "/pricing"];
 const AUTH_PATHS = ["/login", "/register", "/forgot-password"];
 const API_AUTH_EXCEPTIONS = ["/api/auth/", "/api/paddle/webhook", "/api/webhooks/paddle", "/api/health", "/api/usage/increment"];
-
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
@@ -60,7 +59,7 @@ export async function middleware(req: NextRequest) {
   if (AUTH_PATHS.some((p) => pathname.startsWith(p))) {
     const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
     if (token?.sub) {
-      return NextResponse.redirect(new URL("/app/", req.url));
+      return NextResponse.redirect(new URL("/dashboard", req.url));
     }
   }
 

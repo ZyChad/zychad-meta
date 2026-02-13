@@ -41,5 +41,6 @@ export default async function AppPage() {
     );
   }
 
-  redirect("/");
+  // En production sur Vercel, pas de Nginx → rediriger vers le dashboard
+  redirect("/dashboard");
 }

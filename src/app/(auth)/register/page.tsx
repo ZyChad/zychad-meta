@@ -1,25 +1,33 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function RegisterPage() {
-  const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
+  const [googleEnabled, setGoogleEnabled] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/auth/providers")
+      .then((r) => r.json())
+      .then((p) => setGoogleEnabled(!!p?.google))
+      .catch(() => setGoogleEnabled(false));
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+    setSuccess("");
     if (password.length < 8) {
       setError("Le mot de passe doit faire au moins 8 caractères.");
       return;
@@ -40,13 +48,21 @@ export default function RegisterPage() {
         setError(data.error ?? "Erreur lors de l'inscription");
         return;
       }
+      if (data.requiresVerification) {
+        setSuccess(
+          "Compte créé ! Vérifie ton email (et les spams) pour activer ton compte, puis connecte-toi."
+        );
+        return;
+      }
       const signInRes = await signIn("credentials", {
         email: email.toLowerCase(),
         password,
         redirect: false,
+        callbackUrl: "/dashboard",
       });
-      if (signInRes?.url) router.push(signInRes.url);
-      else router.push("/app/");
+      // Full redirect pour que le cookie de session soit bien envoyé
+      const target = signInRes?.url ?? "/dashboard";
+      window.location.href = target;
     } catch {
       setError("Une erreur est survenue.");
     } finally {
@@ -65,6 +81,11 @@ export default function RegisterPage() {
           {error && (
             <p className="text-sm text-[var(--zychad-red)] bg-[var(--zychad-red)]/10 p-3 rounded-md">
               {error}
+            </p>
+          )}
+          {success && (
+            <p className="text-sm text-[var(--zychad-teal)] bg-[var(--zychad-teal)]/10 p-3 rounded-md">
+              {success}
             </p>
           )}
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -107,20 +128,24 @@ export default function RegisterPage() {
               {loading ? "Inscription..." : "S'inscrire"}
             </Button>
           </form>
-          <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t border-[var(--zychad-border)]" />
-            </div>
-            <span className="relative flex justify-center text-xs text-[var(--zychad-dim)]">Ou</span>
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full border-[var(--zychad-border)]"
-            onClick={() => signIn("google", { callbackUrl: "/app/" })}
-          >
-            Continuer avec Google
-          </Button>
+          {googleEnabled && (
+            <>
+              <div className="relative my-6">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t border-[var(--zychad-border)]" />
+                </div>
+                <span className="relative flex justify-center text-xs text-[var(--zychad-dim)]">Ou</span>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full border-[var(--zychad-border)]"
+                onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
+              >
+                Continuer avec Google
+              </Button>
+            </>
+          )}
           <p className="text-center text-sm text-[var(--zychad-dim)]">
             Déjà un compte ?{" "}
             <Link href="/login" className="text-[var(--zychad-teal)] hover:underline">

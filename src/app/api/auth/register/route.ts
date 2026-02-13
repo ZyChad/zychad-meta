@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/rate-limit";
+import { sendVerificationEmail } from "@/lib/email";
 
 export async function POST(req: NextRequest) {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? req.headers.get("x-real-ip") ?? "127.0.0.1";
@@ -40,14 +42,27 @@ export async function POST(req: NextRequest) {
   }
 
   const passwordHash = await bcrypt.hash(password, 12);
+  const requiresVerification = !!process.env.RESEND_API_KEY;
+  const token = requiresVerification ? crypto.randomBytes(32).toString("hex") : null;
+  const expires = requiresVerification ? new Date(Date.now() + 24 * 60 * 60 * 1000) : null;
+
   await prisma.user.create({
     data: {
       email,
       name: name || null,
       passwordHash,
       plan: "FREE",
+      emailVerificationToken: token,
+      emailVerificationExpires: expires,
     },
   });
 
-  return NextResponse.json({ ok: true });
+  if (requiresVerification && token) {
+    await sendVerificationEmail(email, token);
+  }
+
+  return NextResponse.json({
+    ok: true,
+    requiresVerification,
+  });
 }

@@ -15,6 +15,8 @@ model User {
   passwordHash    String?
   image           String?
   emailVerified   DateTime?
+  emailVerificationToken   String?
+  emailVerificationExpires DateTime?
   plan            Plan      @default(FREE)
   paddleCustomerId      String?   @unique
   paddleSubscriptionId  String?

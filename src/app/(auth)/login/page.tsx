@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState, Suspense, useEffect } from "react";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -11,11 +11,23 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 
 function LoginForm() {
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("redirect") || "/app/";
+  const callbackUrl = searchParams.get("redirect") || "/dashboard";
+  const verified = searchParams.get("verified") === "1";
+  const errorParam = searchParams.get("error");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [googleEnabled, setGoogleEnabled] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/auth/providers")
+      .then((r) => r.json())
+      .then((p) => setGoogleEnabled(!!p?.google))
+      .catch(() => setGoogleEnabled(false));
+    if (errorParam === "token_invalid") setError("Lien de vérification invalide ou expiré.");
+    if (errorParam === "token_missing") setError("Lien de vérification manquant.");
+  }, [errorParam]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -32,6 +44,7 @@ function LoginForm() {
         setError(res.error);
         return;
       }
+      // Full redirect pour que le cookie de session soit bien envoyé
       window.location.href = res?.url ?? callbackUrl;
     } catch {
       setError("Une erreur est survenue.");
@@ -48,6 +61,11 @@ function LoginForm() {
           <CardDescription>Accède à ton compte ZyChad Meta</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {verified && (
+            <p className="text-sm text-[var(--zychad-teal)] bg-[var(--zychad-teal)]/10 p-3 rounded-md">
+              Email vérifié ! Tu peux te connecter.
+            </p>
+          )}
           {error && (
             <p className="text-sm text-[var(--zychad-red)] bg-[var(--zychad-red)]/10 p-3 rounded-md">
               {error}
@@ -86,20 +104,24 @@ function LoginForm() {
               {loading ? "Connexion..." : "Se connecter"}
             </Button>
           </form>
-          <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t border-[var(--zychad-border)]" />
-            </div>
-            <span className="relative flex justify-center text-xs text-[var(--zychad-dim)]">Ou</span>
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full border-[var(--zychad-border)]"
-            onClick={() => signIn("google", { callbackUrl })}
-          >
-            Continuer avec Google
-          </Button>
+          {googleEnabled && (
+            <>
+              <div className="relative my-6">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t border-[var(--zychad-border)]" />
+                </div>
+                <span className="relative flex justify-center text-xs text-[var(--zychad-dim)]">Ou</span>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full border-[var(--zychad-border)]"
+                onClick={() => signIn("google", { callbackUrl })}
+              >
+                Continuer avec Google
+              </Button>
+            </>
+          )}
           <p className="text-center text-sm text-[var(--zychad-dim)]">
             Pas encore de compte ?{" "}
             <Link href="/register" className="text-[var(--zychad-teal)] hover:underline">

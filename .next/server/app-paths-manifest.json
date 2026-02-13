@@ -2,6 +2,6 @@
   "/(marketing)/page": "app/(marketing)/page.js",
   "/conditions/page": "app/conditions/page.js",
   "/confidentialite/page": "app/confidentialite/page.js",
-  "/remboursement/page": "app/remboursement/page.js",
-  "/contact/page": "app/contact/page.js"
+  "/contact/page": "app/contact/page.js",
+  "/remboursement/page": "app/remboursement/page.js"
 }

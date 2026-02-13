@@ -12,6 +12,7 @@ export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma) as NextAuthOptions["adapter"],
   session: { strategy: "jwt", maxAge: 24 * 60 * 60 },
   pages: { signIn: "/login" },
+  trustHost: true, // requis pour Vercel / domaine personnalisé
   providers: [
     ...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
       ? [
@@ -34,6 +35,11 @@ export const authOptions: NextAuthOptions = {
           where: { email: credentials.email.toLowerCase() },
         });
         if (!user?.passwordHash) return null;
+
+        // Vérification email requise si un token a été envoyé
+        if (user.emailVerificationToken && !user.emailVerified) {
+          throw new Error("Vérifie ton email avant de te connecter. Regarde ta boîte de réception.");
+        }
 
         if (user.lockedUntil && new Date(user.lockedUntil) > new Date()) {
           throw new Error("Compte temporairement verrouillé. Réessaie dans 15 minutes.");
@@ -73,6 +79,15 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
+    async signIn({ user, account }) {
+      if (account?.provider === "google" && user?.email) {
+        await prisma.user.updateMany({
+          where: { email: user.email },
+          data: { emailVerified: new Date(), emailVerificationToken: null, emailVerificationExpires: null },
+        });
+      }
+      return true;
+    },
     async jwt({ token, user }) {
       if (user) {
         const uid = (user as { id?: string }).id ?? token.sub;

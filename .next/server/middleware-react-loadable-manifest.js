@@ -1,1 +1,1 @@
-self.__REACT_LOADABLE_MANIFEST="{\"app\\\\billing\\\\BillingClient.tsx -> @paddle/paddle-js\":{\"id\":\"app\\\\billing\\\\BillingClient.tsx -> @paddle/paddle-js\",\"files\":[\"static/chunks/_app-pages-browser_node_modules_paddle_paddle-js_dist_index_esm_js.js\"]}}"
+self.__REACT_LOADABLE_MANIFEST="{}"
