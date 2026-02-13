@@ -12,7 +12,6 @@ export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma) as NextAuthOptions["adapter"],
   session: { strategy: "jwt", maxAge: 24 * 60 * 60 },
   pages: { signIn: "/login" },
-  trustHost: true, // requis pour Vercel / domaine personnalisé
   providers: [
     ...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
       ? [
