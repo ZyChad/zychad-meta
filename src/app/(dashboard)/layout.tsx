@@ -29,6 +29,7 @@ export default async function DashboardLayout({
           plan={plan}
           userImage={dbUser?.image ?? user.image}
           userName={dbUser?.name ?? user.name ?? user.email ?? null}
+          botUrl={process.env.BOT_URL ?? process.env.NEXT_PUBLIC_BOT_URL}
         />
         <main className="flex-1 overflow-auto">{children}</main>
       </div>

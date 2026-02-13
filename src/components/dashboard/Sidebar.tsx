@@ -5,9 +5,7 @@ import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import {
   LayoutDashboard,
-  Zap,
-  Scissors,
-  History,
+  Bot,
   Settings,
   CreditCard,
   LogOut,
@@ -16,24 +14,31 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const NAV = [
-  { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
-  { href: "/dashboard/uniquify", label: "Uniquifier", icon: Zap },
-  { href: "/dashboard/scraper", label: "Scraper", icon: Scissors },
-  { href: "/dashboard/history", label: "Historique", icon: History },
+  { href: "/dashboard", label: "Accueil", icon: LayoutDashboard },
   { href: "/dashboard/billing", label: "Facturation", icon: CreditCard },
   { href: "/dashboard/settings", label: "Paramètres", icon: Settings },
 ];
 
-export function Sidebar({ plan, userImage, userName }: { plan: string; userImage?: string | null; userName?: string | null }) {
+export function Sidebar({
+  plan,
+  userImage,
+  userName,
+  botUrl,
+}: {
+  plan: string;
+  userImage?: string | null;
+  userName?: string | null;
+  botUrl?: string | null;
+}) {
   const pathname = usePathname();
 
   return (
-    <aside className="w-56 border-r border-[var(--zychad-border)] bg-[var(--zychad-surface)] min-h-screen flex flex-col">
-      <div className="p-4 border-b border-[var(--zychad-border)]">
-        <Link href="/dashboard" className="text-lg font-bold text-[var(--zychad-teal-bright)] flex items-center gap-2">
-          ⚡ ZyChad Meta
+    <aside className="w-56 border-r border-[var(--zychad-border)] bg-[var(--zychad-surface)]/50 min-h-screen flex flex-col">
+      <div className="p-5 border-b border-[var(--zychad-border)]">
+        <Link href="/dashboard" className="text-lg font-bold text-[var(--zychad-teal-bright)] flex items-center gap-2 hover:opacity-90 transition">
+          <span className="text-xl">⚡</span> ZyChad Meta
         </Link>
-        <span className="inline-block mt-2 text-xs px-2 py-0.5 rounded bg-[var(--zychad-border)] text-[var(--zychad-dim)]">
+        <span className="inline-block mt-3 text-xs px-2.5 py-1 rounded-lg bg-[var(--zychad-teal)]/10 text-[var(--zychad-teal-bright)] border border-[var(--zychad-teal)]/20">
           {plan}
         </span>
       </div>
@@ -57,12 +62,26 @@ export function Sidebar({ plan, userImage, userName }: { plan: string; userImage
             </Link>
           );
         })}
+        <a
+          href={botUrl || "/app/"}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={cn(
+            "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors mt-2",
+            "bg-gradient-to-r from-[var(--zychad-teal)]/20 to-[var(--zychad-teal)]/10",
+            "text-[var(--zychad-teal-bright)] hover:from-[var(--zychad-teal)]/30 hover:to-[var(--zychad-teal)]/15",
+            "border border-[var(--zychad-teal)]/30"
+          )}
+        >
+          <Bot className="w-4 h-4" />
+          Accéder au bot
+        </a>
       </nav>
       <div className="p-4 border-t border-[var(--zychad-border)] flex items-center gap-3">
         {userImage ? (
-          <img src={userImage} alt="" className="w-8 h-8 rounded-full" />
+          <img src={userImage} alt="" className="w-9 h-9 rounded-xl object-cover" />
         ) : (
-          <div className="w-8 h-8 rounded-full bg-[var(--zychad-teal)]/30 flex items-center justify-center text-sm font-medium text-[var(--zychad-teal-bright)]">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[var(--zychad-teal)]/30 to-[var(--zychad-teal)]/10 flex items-center justify-center text-sm font-semibold text-[var(--zychad-teal-bright)]">
             {(userName ?? "U").charAt(0).toUpperCase()}
           </div>
         )}
@@ -71,7 +90,7 @@ export function Sidebar({ plan, userImage, userName }: { plan: string; userImage
           <Button
             variant="ghost"
             size="sm"
-            className="text-xs text-[var(--zychad-dim)] h-auto p-0 hover:text-[var(--zychad-red)]"
+            className="text-xs text-[var(--zychad-dim)] h-auto p-0 hover:text-[var(--zychad-red)] transition"
             onClick={() => signOut({ callbackUrl: "/" })}
           >
             <LogOut className="w-3 h-3 mr-1 inline" /> Déconnexion

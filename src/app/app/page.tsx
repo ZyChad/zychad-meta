@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import Link from "next/link";
@@ -41,6 +42,31 @@ export default async function AppPage() {
     );
   }
 
-  // En production sur Vercel, pas de Nginx → rediriger vers le dashboard
-  redirect("/dashboard");
+  const botUrl = process.env.BOT_URL ?? process.env.NEXT_PUBLIC_BOT_URL;
+  if (botUrl) {
+    redirect(botUrl);
+  }
+
+  // Bot non déployé : page d'attente
+  return (
+    <div className="min-h-screen bg-[var(--zychad-bg)] flex items-center justify-center p-8">
+      <div className="max-w-md text-center space-y-6">
+        <div className="w-16 h-16 mx-auto rounded-2xl bg-[var(--zychad-teal)]/20 flex items-center justify-center">
+          <span className="text-3xl">⚡</span>
+        </div>
+        <h1 className="text-2xl font-bold text-[var(--zychad-text)]">
+          Bot en cours de déploiement
+        </h1>
+        <p className="text-[var(--zychad-dim)]">
+          L&apos;application d&apos;uniquification sera bientôt disponible ici. En attendant, utilise le dashboard.
+        </p>
+        <Link
+          href="/dashboard"
+          className="inline-block px-6 py-3 rounded-xl bg-[var(--zychad-teal)] text-[var(--zychad-bg)] font-semibold hover:opacity-90 transition"
+        >
+          Retour au dashboard
+        </Link>
+      </div>
+    </div>
+  );
 }
