@@ -1,0 +1,25 @@
+---
+description: Règles absolues ZyChad Meta - Processing engine et dashboard React
+alwaysApply: true
+---
+
+# ZyChad Meta — Règles absolues
+
+## ⛔ NE JAMAIS TOUCHER
+
+- **processing/uniquify_video.py** — EXISTANT, READ-ONLY. Le worker l'exécute côté serveur.
+- **processing/uniquify_image.py** — EXISTANT, READ-ONLY. Le worker l'exécute côté serveur.
+- **Ne pas inventer de nouvelles techniques de processing** — elles sont déjà toutes codées.
+
+## 🚫 NE PAS UTILISER
+
+- **Pas d'iframe** — pas de proxy vers un bot externe.
+- **Pas de script Python à lancer par l'utilisateur** — tout est hébergé côté serveur.
+
+## ✅ APPROCHE
+
+- **Dashboard UI** : React/Next.js avec le MÊME visuel exact (mêmes composants, même UX).
+- **Flow** : Drop zone → Upload S3 → Config (variantes, mode) → BullMQ → Worker Python → SSE progress → Results.
+- **PIPE** : Dashboard → API → BullMQ → Worker (appelle scripts Python) → S3 → SSE. Tu ne codes PAS le traitement.
+
+**Référence complète :** `PROMPT_CURSOR.md`

@@ -1,0 +1,20 @@
+# Bot uniquement — LP/Auth sur Vercel, auth_request vers www.zychadmeta.com
+# Usage: docker compose -f docker-compose.bot-only.yml up -d
+
+services:
+  bot:
+    build: { context: ./processing, dockerfile: Dockerfile }
+    expose: ["5000"]
+    environment:
+      - INTERNAL_SECRET=${INTERNAL_SECRET}
+      - WEB_URL=https://www.zychadmeta.com
+    restart: always
+
+  nginx:
+    image: nginx:alpine
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./nginx/nginx-bot-only.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on: [bot]
+    restart: always

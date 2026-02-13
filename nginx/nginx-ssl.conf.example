@@ -1,0 +1,78 @@
+# Exemple de config Nginx avec SSL (HTTPS)
+# 1. Copie ce fichier : cp nginx-ssl.conf.example nginx.conf
+# 2. Remplace TON_DOMAINE par ton domaine (ex: zychadmeta.com)
+# 3. Mets tes certificats dans nginx/ssl/ :
+#    - fullchain.pem (certificat Let's Encrypt)
+#    - privkey.pem (clé privée)
+# 4. Ou génère avec Certbot : certbot certonly --standalone -d TON_DOMAINE
+
+events { worker_connections 1024; }
+http {
+    gzip on;
+    gzip_types text/css application/json application/javascript text/xml image/svg+xml;
+    client_max_body_size 500M;
+    server_tokens off;
+    proxy_hide_header X-Powered-By;
+
+    upstream web { server web:3000; }
+    upstream bot { server bot:5000; }
+
+    # Redirection HTTP → HTTPS
+    server {
+        listen 80;
+        server_name TON_DOMAINE www.TON_DOMAINE;
+        return 301 https://$host$request_uri;
+    }
+
+    server {
+        listen 443 ssl http2;
+        server_name TON_DOMAINE www.TON_DOMAINE;
+
+        ssl_certificate     /etc/nginx/ssl/fullchain.pem;
+        ssl_certificate_key /etc/nginx/ssl/privkey.pem;
+        ssl_protocols TLSv1.2 TLSv1.3;
+
+        location / {
+            proxy_pass http://web;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        location /app/ {
+            auth_request /auth/verify;
+            auth_request_set $auth_status $upstream_status;
+            auth_request_set $user_id $upstream_http_x_user_id;
+            auth_request_set $user_plan $upstream_http_x_user_plan;
+
+            proxy_pass http://bot/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-User-Id $user_id;
+            proxy_set_header X-User-Plan $user_plan;
+
+            proxy_read_timeout 300s;
+            proxy_connect_timeout 60s;
+            proxy_send_timeout 300s;
+
+            error_page 401 = @login_redirect;
+            error_page 403 = @upgrade_redirect;
+        }
+
+        location = /auth/verify {
+            internal;
+            proxy_pass http://web/api/auth/verify;
+            proxy_pass_request_body off;
+            proxy_set_header Content-Length "";
+            proxy_set_header X-Original-URI $request_uri;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header Cookie $http_cookie;
+        }
+
+        location @login_redirect { return 302 https://$host/login?redirect=/app/; }
+        location @upgrade_redirect { return 302 https://$host/billing?reason=quota; }
+
+        location ~ /\. { deny all; }
+    }
+}

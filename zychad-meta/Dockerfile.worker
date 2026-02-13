@@ -1,0 +1,12 @@
+FROM node:20-alpine AS base
+RUN apk add --no-cache python3 py3-pip ffmpeg
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --only=production
+COPY . .
+RUN npx prisma generate
+
+COPY processing/ ./processing/
+RUN pip3 install -r processing/requirements.txt
+
+CMD ["npm", "run", "worker"]

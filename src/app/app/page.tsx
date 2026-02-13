@@ -43,7 +43,7 @@ export default async function AppPage() {
   }
 
   if (botUrl) {
-    redirect(botUrl);
+    redirect("/api/bot-token?redirect=" + encodeURIComponent(botUrl.replace(/\/$/, "") + "/"));
   }
 
   // Bot non déployé : page d'attente

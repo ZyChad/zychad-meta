@@ -4,7 +4,7 @@ import type { NextRequest } from "next/server";
 
 const PUBLIC_PATHS = ["/", "/login", "/register", "/forgot-password", "/pricing"];
 const AUTH_PATHS = ["/login", "/register", "/forgot-password"];
-const API_AUTH_EXCEPTIONS = ["/api/auth/", "/api/paddle/webhook", "/api/webhooks/paddle", "/api/health", "/api/usage/increment"];
+const API_AUTH_EXCEPTIONS = ["/api/auth/", "/api/bot-token", "/api/paddle/webhook", "/api/webhooks/paddle", "/api/health", "/api/usage/increment"];
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
@@ -63,7 +63,7 @@ export async function middleware(req: NextRequest) {
       const botUrl = process.env.NEXT_PUBLIC_BOT_URL ?? process.env.BOT_URL ?? "https://app.zychadmeta.com";
       if (redirectTo && (redirectTo.startsWith(botUrl) || redirectTo.includes("app.zychadmeta.com"))) {
         const target = redirectTo.replace(/\/$/, "") + "/";
-        return NextResponse.redirect(new URL("/api/auth/bot-token?redirect=" + encodeURIComponent(target), req.url));
+        return NextResponse.redirect(new URL("/api/bot-token?redirect=" + encodeURIComponent(target), req.url));
       }
       return NextResponse.redirect(new URL("/dashboard", req.url));
     }
@@ -78,7 +78,7 @@ export async function middleware(req: NextRequest) {
       const botUrl = process.env.NEXT_PUBLIC_BOT_URL ?? process.env.BOT_URL ?? "https://app.zychadmeta.com";
       const target = botUrl.replace(/\/$/, "") + "/";
       const wwwBase = (process.env.NEXTAUTH_URL ?? `https://www.${host.replace("app.", "")}`).replace(/\/$/, "");
-      return NextResponse.redirect(new URL("/api/auth/bot-token?redirect=" + encodeURIComponent(target), wwwBase));
+      return NextResponse.redirect(new URL("/api/bot-token?redirect=" + encodeURIComponent(target), wwwBase));
     }
     return res;
   }

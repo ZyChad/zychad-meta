@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { LOGO_DATA_URL } from "@/lib/brand";
 
 // v2 - Uniquifier/Scraper/Historique retirés, Accéder au bot ajouté
 const NAV = [
@@ -36,8 +37,9 @@ export function Sidebar({
   return (
     <aside className="w-56 border-r border-[var(--br)] bg-[var(--s1)] min-h-screen flex flex-col">
       <div className="p-5 border-b border-[var(--br)]">
-        <Link href="/dashboard" className="text-lg font-bold text-[var(--zychad-teal-bright)] flex items-center gap-2 hover:opacity-90 transition">
-          <span className="text-xl">⚡</span> ZyChad Meta
+        <Link href="/dashboard" className="text-lg font-bold text-[var(--t2)] flex items-center gap-2 hover:opacity-90 transition">
+          <img src={LOGO_DATA_URL} alt="ZyChad Meta" className="w-10 h-10 rounded-[10px] flex-shrink-0" />
+          ZyChad Meta
         </Link>
         <span className="inline-block mt-3 text-xs px-2.5 py-1 rounded-md bg-[rgba(14,165,199,.06)] text-[var(--zychad-teal-bright)] border border-[rgba(14,165,199,.15)]">
           {plan}
@@ -64,7 +66,7 @@ export function Sidebar({
           );
         })}
         <a
-          href={botUrl || "/app/"}
+          href={botUrl ? `/api/bot-token?redirect=${encodeURIComponent(botUrl + "/")}` : "/app/"}
           target="_blank"
           rel="noopener noreferrer"
           className={cn(

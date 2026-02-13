@@ -1,0 +1,145 @@
+// PostgreSQL (Neon, Supabase, ou local)
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String    @id @default(cuid())
+  email           String    @unique
+  name            String?
+  passwordHash    String?
+  image           String?
+  emailVerified   DateTime?
+  emailVerificationToken   String?
+  emailVerificationExpires DateTime?
+  plan            Plan      @default(FREE)
+  paddleCustomerId      String?   @unique
+  paddleSubscriptionId  String?
+  subscriptionStatus    String?
+  subscriptionEnd       DateTime?
+  apiKey          String?   @unique @default(cuid())
+  apiKeyHash      String?
+  filesProcessedTotal     Int @default(0)
+  filesProcessedThisMonth Int @default(0)
+  scraperCallsThisMonth   Int @default(0)
+  quotaResetDate  DateTime?
+  failedLoginAttempts Int    @default(0)
+  lockedUntil     DateTime?
+  lastLoginAt     DateTime?
+  lastLoginIp     String?
+  jobs            Job[]
+  scraperJobs     ScraperJob[]
+  accounts        Account[]
+  sessions        Session[]
+  auditLogs       AuditLog[]
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([email])
+  @@index([paddleCustomerId])
+  @@index([apiKeyHash])
+}
+
+enum Plan {
+  FREE
+  STARTER
+  PRO
+  AGENCY
+}
+
+model Job {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status      JobStatus @default(PENDING)
+  inputFiles  Json
+  variants    Int       @default(3)
+  mode        String    @default("normal")
+  outputFiles Json?
+  outputZipKey String?
+  progress    Int       @default(0)
+  total       Int       @default(0)
+  currentFile String?
+  logs        Json?
+  startedAt   DateTime?
+  completedAt DateTime?
+  expiresAt   DateTime?
+  error       String?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime  @default(now())
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([status])
+  @@index([expiresAt])
+}
+
+enum JobStatus {
+  PENDING
+  UPLOADING
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+  EXPIRED
+}
+
+model ScraperJob {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  platform        String
+  username        String
+  status          String   @default("pending")
+  filesFound      Int      @default(0)
+  filesDownloaded Int      @default(0)
+  s3Prefix        String?
+  error           String?
+  createdAt       DateTime @default(now())
+
+  @@index([userId, createdAt(sort: Desc)])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  action    String
+  details   Json?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([action, createdAt(sort: Desc)])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}

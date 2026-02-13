@@ -61,7 +61,7 @@ export default async function DashboardOverviewPage() {
             Ouvre le bot pour uploader tes fichiers, choisir le mode et générer des variantes uniques.
           </p>
           <a
-            href={botUrl || "/app/"}
+            href={botUrl ? `/api/bot-token?redirect=${encodeURIComponent(botUrl + "/")}` : "/app/"}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 px-8 py-4 rounded-lg bg-[var(--teal)] text-white font-semibold hover:bg-[var(--t2)] hover:shadow-[0_4px_20px_rgba(14,165,199,.25)] transition-all"
