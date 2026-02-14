@@ -6,6 +6,7 @@ import { checkCanProcess } from "@/lib/quota";
 
 export async function GET(req: NextRequest) {
   let userId: string | null = null;
+  const originalHost = req.headers.get("x-original-host") ?? "";
 
   const urlToken = req.nextUrl.searchParams.get("token");
   if (urlToken) {
@@ -18,7 +19,7 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  if (!userId) {
+  if (!userId && !originalHost.includes("app.zychadmeta.com")) {
     const token = await getToken({
       req,
       secret: process.env.NEXTAUTH_SECRET,

@@ -24,6 +24,8 @@ model User {
   subscriptionEnd       DateTime?
   apiKey          String?   @unique @default(cuid())
   apiKeyHash      String?
+  telegramChatId  String?
+  telegramTopicId String?
   filesProcessedTotal     Int @default(0)
   filesProcessedThisMonth Int @default(0)
   scraperCallsThisMonth   Int @default(0)

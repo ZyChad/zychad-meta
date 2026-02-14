@@ -4,7 +4,7 @@ import type { NextRequest } from "next/server";
 
 const PUBLIC_PATHS = ["/", "/login", "/register", "/forgot-password", "/pricing"];
 const AUTH_PATHS = ["/login", "/register", "/forgot-password"];
-const API_AUTH_EXCEPTIONS = ["/api/auth/", "/api/bot-token", "/api/paddle/webhook", "/api/webhooks/paddle", "/api/health", "/api/usage/increment"];
+const API_AUTH_EXCEPTIONS = ["/api/auth/", "/api/bot-token", "/api/paddle/webhook", "/api/webhooks/paddle", "/api/health", "/api/usage/increment", "/api/internal/"];
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 

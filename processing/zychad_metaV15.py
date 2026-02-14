@@ -64,6 +64,27 @@ def save_config(data):
         CONFIG_FILE.write_text(json.dumps(cfg,indent=2))
     except: pass
 
+# ─── SaaS: user-specific Telegram settings (from Vercel API) ───
+def load_user_settings(user_id):
+    """Fetch tg_dest_chat_id, tg_dest_topic_id from Vercel for this user."""
+    web_url=os.environ.get("WEB_URL","http://web:3000")
+    secret=os.environ.get("INTERNAL_SECRET","")
+    if not web_url or not secret or not user_id: return {}
+    try:
+        r=rq.get(f"{web_url}/api/internal/user-settings",params={"userId":user_id},headers={"X-Internal-Secret":secret},timeout=5)
+        if r.status_code==200: return r.json()
+    except: pass
+    return {}
+def save_user_settings(user_id,tg_dest_chat_id,tg_dest_topic_id):
+    """Save tg_dest_chat_id, tg_dest_topic_id to Vercel for this user."""
+    web_url=os.environ.get("WEB_URL","http://web:3000")
+    secret=os.environ.get("INTERNAL_SECRET","")
+    if not web_url or not secret or not user_id: return False
+    try:
+        r=rq.post(f"{web_url}/api/internal/user-settings",json={"userId":user_id,"tg_dest_chat_id":tg_dest_chat_id or "","tg_dest_topic_id":tg_dest_topic_id or ""},headers={"X-Internal-Secret":secret,"Content-Type":"application/json"},timeout=5)
+        return r.status_code==200
+    except: return False
+
 # ─── Find free port ───
 def find_free_port(preferred=61550):
     try:
@@ -3566,7 +3587,13 @@ class H(BaseHTTPRequestHandler):
             self._json({"active":state["active"],"progress":state["progress"],"total":state["total"],"file":state["file"],"log":state["log"][-150:],"results":state["results"],"done":state["done"],"zip":state["zip"],"input":state.get("input",""),"preview":preview_sorted,"gdrive_uploading":gdrive_state.get("uploading",False),"gdrive_done":gdrive_state.get("done",False),"gdrive_error":gdrive_state.get("error",""),"tg_uploading":tg_send_state.get("uploading",False),"tg_done":tg_send_state.get("done",False),"tg_error":tg_send_state.get("error",""),"paused":state.get("paused",False),"cancelled":state.get("cancelled",False),"eta":state.get("eta",""),"queue":state.get("files_list",[])})
         elif self.path=="/api/scrape-progress": self._json({"active":scrape_state["active"],"done":scrape_state["done"],"downloaded":scrape_state["downloaded"],"total":scrape_state["total"],"folder":scrape_state["folder"],"log":scrape_state["log"][-50:]})
         elif self.path=="/api/tt-progress": self._json({"active":tt_state["active"],"done":tt_state["done"],"downloaded":tt_state["downloaded"],"total":tt_state["total"],"folder":tt_state["folder"],"log":tt_state["log"][-50:]})
-        elif self.path=="/api/config": self._json(load_config())
+        elif self.path=="/api/config":
+            cfg=load_config()
+            uid=self.headers.get("X-User-Id")
+            if uid:
+                us=load_user_settings(uid)
+                if us: cfg.update(us)
+            self._json(cfg)
         elif self.path=="/api/api-key": self._json({"key":get_api_key()})
         elif self.path=="/api/api-key-regen":
             key=generate_api_key(); save_config({"api_key":key}); self._json({"key":key})
@@ -3765,7 +3792,12 @@ else{document.body.innerHTML='<h2 style="font-family:sans-serif;text-align:cente
             self._json(r)
         elif self.path=="/api/save-config":
             b=json.loads(self.rfile.read(int(self.headers.get("Content-Length",0))))
-            save_config(b); self._json({"ok":True})
+            uid=self.headers.get("X-User-Id")
+            if uid and ("tg_dest_chat_id" in b or "tg_dest_topic_id" in b):
+                save_user_settings(uid,b.get("tg_dest_chat_id",""),b.get("tg_dest_topic_id",""))
+                b={k:v for k,v in b.items() if k not in ("tg_dest_chat_id","tg_dest_topic_id")}
+            if b: save_config(b)
+            self._json({"ok":True})
         elif self.path=="/api/scheduler-add":
             b=json.loads(self.rfile.read(int(self.headers.get("Content-Length",0))))
             jid=scheduler_add(b); self._json({"ok":True,"id":jid})
