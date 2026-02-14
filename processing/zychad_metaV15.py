@@ -46,9 +46,6 @@ try:
 except: HAS_NUMPY = False
 import requests as rq
 
-# ─── SaaS: user id from Nginx auth_request (X-User-Id header) ───
-saas_user_id=None
-
 # ─── Config persistence (saves API keys locally) ───
 CONFIG_FILE=Path(os.path.dirname(os.path.abspath(__file__)))/"zychad_config.json"
 
@@ -63,27 +60,6 @@ def save_config(data):
         cfg=load_config(); cfg.update(data)
         CONFIG_FILE.write_text(json.dumps(cfg,indent=2))
     except: pass
-
-# ─── SaaS: user-specific Telegram settings (from Vercel API) ───
-def load_user_settings(user_id):
-    """Fetch tg_dest_chat_id, tg_dest_topic_id from Vercel for this user."""
-    web_url=os.environ.get("WEB_URL","http://web:3000")
-    secret=os.environ.get("INTERNAL_SECRET","")
-    if not web_url or not secret or not user_id: return {}
-    try:
-        r=rq.get(f"{web_url}/api/internal/user-settings",params={"userId":user_id},headers={"X-Internal-Secret":secret},timeout=5)
-        if r.status_code==200: return r.json()
-    except: pass
-    return {}
-def save_user_settings(user_id,tg_dest_chat_id,tg_dest_topic_id):
-    """Save tg_dest_chat_id, tg_dest_topic_id to Vercel for this user."""
-    web_url=os.environ.get("WEB_URL","http://web:3000")
-    secret=os.environ.get("INTERNAL_SECRET","")
-    if not web_url or not secret or not user_id: return False
-    try:
-        r=rq.post(f"{web_url}/api/internal/user-settings",json={"userId":user_id,"tg_dest_chat_id":tg_dest_chat_id or "","tg_dest_topic_id":tg_dest_topic_id or ""},headers={"X-Internal-Secret":secret,"Content-Type":"application/json"},timeout=5)
-        return r.status_code==200
-    except: return False
 
 # ─── Find free port ───
 def find_free_port(preferred=61550):
@@ -1968,15 +1944,6 @@ def run_proc(idir,odir,nv,nw,rename=False,dest="local",gdrive_folder_id="",tg_ch
     log(msg,"error" if state.get("cancelled") else "ok")
     track_stat("variants",len(state['results']))
     state.update(active=False,done=True)
-    # SaaS: callback to increment quota
-    global saas_user_id
-    if saas_user_id and not state.get("cancelled") and state.get("results"):
-        web_url=os.environ.get("WEB_URL","http://web:3000")
-        secret=os.environ.get("INTERNAL_SECRET","")
-        if web_url and secret:
-            try:
-                rq.post(f"{web_url}/api/usage/increment",json={"userId":saas_user_id,"filesCount":len(files)},headers={"X-Internal-Secret":secret,"Content-Type":"application/json"},timeout=5)
-            except Exception as _e: pass
 
 # ─── Preview (single variant) ───
 def run_preview(idir,odir):
@@ -2271,8 +2238,7 @@ body.light .tag{border-color:var(--br);color:var(--dim)}
 <div class="c">
 <div class="sl">Configuration</div>
 <div class="fl"><label>Dossier source</label>
-<div id="dropzone" style="border:2px dashed var(--br);border-radius:10px;padding:20px;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:6px" onclick="if(new URLSearchParams(location.search).get('token')){document.getElementById('file-input').click()}else{pickFolder('idir')}" ondragover="event.preventDefault();this.style.borderColor='var(--teal)';this.style.background='rgba(14,165,199,.05)'" ondragleave="this.style.borderColor='var(--br)';this.style.background='none'" ondrop="handleDrop(event)">
-<input type="file" id="file-input" multiple accept=".mp4,.mov,.avi,.mkv,.webm,.jpg,.jpeg,.png,.webp,.gif,.bmp" style="display:none" onchange="if(this.files.length){handleDrop({preventDefault:()=>{},dataTransfer:{files:this.files}});this.value=''}">
+<div id="dropzone" style="border:2px dashed var(--br);border-radius:10px;padding:20px;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:6px" onclick="pickFolder('idir')" ondragover="event.preventDefault();this.style.borderColor='var(--teal)';this.style.background='rgba(14,165,199,.05)'" ondragleave="this.style.borderColor='var(--br)';this.style.background='none'" ondrop="handleDrop(event)">
 <div id="dz-text" style="color:var(--mut);font-size:12px">
 <div style="font-size:28px;margin-bottom:8px;opacity:.5">📂</div>
 Glisse tes fichiers ici ou clique pour parcourir<br>
@@ -2754,8 +2720,6 @@ Ou envoyer un fichier → reçoit les variantes
 
 <script>
 let poll,spoll;
-// SaaS: transmettre le token à toutes les requêtes API (Nginx auth_request)
-function apiUrl(u){const t=new URLSearchParams(location.search).get('token');return t?u+(u.includes('?')?'&':'?')+'token='+encodeURIComponent(t):u;}
 
 /* Tabs */
 function stab(n){
@@ -2766,7 +2730,7 @@ function stab(n){
 /* Config auto-load/save */
 async function loadCfg(){
   try{
-    const c=await(await fetch(apiUrl('/api/config'))).json();
+    const c=await(await fetch('/api/config')).json();
     if(c.ig_key) document.getElementById('skey').value=c.ig_key;
     if(c.tt_key) document.getElementById('ttkey').value=c.tt_key;
     if(c.variants) document.getElementById('nv').value=c.variants;
@@ -2778,7 +2742,7 @@ async function loadCfg(){
 }
 function saveCfg(){
   const d={ig_key:document.getElementById('skey').value,tt_key:document.getElementById('ttkey').value,variants:document.getElementById('nv').value,workers:document.getElementById('nw').value,gdrive_folder_id:document.getElementById('gd-folder-id').value,tg_dest_chat_id:document.getElementById('tg-chat-id').value,tg_dest_topic_id:document.getElementById('tg-topic-id').value};
-  fetch(apiUrl('/api/save-config'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});
+  fetch('/api/save-config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});
 }
 // Auto-save when API key fields lose focus
 document.addEventListener('DOMContentLoaded',()=>{
@@ -2786,17 +2750,12 @@ document.addEventListener('DOMContentLoaded',()=>{
     const el=document.getElementById(id);
     if(el) el.addEventListener('blur',saveCfg);
   });
-  // SaaS: chemin sortie par défaut si vide (évite chemins Windows invalides)
-  if(new URLSearchParams(location.search).get('token')){
-    const odir=document.getElementById('odir');
-    if(odir&&(!odir.value||odir.value.includes(':\\')||odir.value.includes('C:')))odir.value='/tmp/zychad_output';
-  }
 });
 
 /* Presets — custom, saved in config */
 async function loadPresets(){
   try{
-    const c=await(await fetch(apiUrl('/api/config'))).json();
+    const c=await(await fetch('/api/config')).json();
     const bar=document.getElementById('presetBar');
     // Clear existing preset buttons (keep the + button)
     bar.querySelectorAll('.preset-btn').forEach(b=>b.remove());
@@ -2821,16 +2780,16 @@ function savePreset(){
   const name=prompt('Nom du préset :');
   if(!name) return;
   const p={v:parseInt(document.getElementById('nv').value)||10,w:parseInt(document.getElementById('nw').value)||4,r:document.getElementById('rn').checked};
-    fetch(apiUrl('/api/config')).then(r=>r.json()).then(c=>{
+  fetch('/api/config').then(r=>r.json()).then(c=>{
     if(!c.presets) c.presets={};
     c.presets[name]=p;
-    fetch(apiUrl('/api/save-config'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({presets:c.presets})}).then(()=>loadPresets());
+    fetch('/api/save-config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({presets:c.presets})}).then(()=>loadPresets());
   });
 }
 function deletePreset(name){
-    fetch(apiUrl('/api/config')).then(r=>r.json()).then(c=>{
+  fetch('/api/config').then(r=>r.json()).then(c=>{
     if(c.presets) delete c.presets[name];
-    fetch(apiUrl('/api/save-config'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({presets:c.presets||{}})}).then(()=>loadPresets());
+    fetch('/api/save-config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({presets:c.presets||{}})}).then(()=>loadPresets());
   });
 }
 
@@ -2852,11 +2811,11 @@ function renderPreview(){
   const isVid=fname.endsWith('.mp4');
   const origName=g.orig;
   if(isVid){
-    origC.innerHTML='<video src="'+apiUrl('/api/original/'+origName)+'" style="width:100%;border-radius:6px" controls muted></video>';
-    modC.innerHTML='<video src="'+apiUrl('/api/preview/'+fname)+'" style="width:100%;border-radius:6px" controls muted></video>';
+    origC.innerHTML='<video src="/api/original/'+origName+'" style="width:100%;border-radius:6px" controls muted></video>';
+    modC.innerHTML='<video src="/api/preview/'+fname+'" style="width:100%;border-radius:6px" controls muted></video>';
   }else{
-    origC.innerHTML='<img src="'+apiUrl('/api/original/'+origName)+'" style="width:100%;border-radius:6px">';
-    modC.innerHTML='<img src="'+apiUrl('/api/preview/'+fname)+'" style="width:100%;border-radius:6px">';
+    origC.innerHTML='<img src="/api/original/'+origName+'" style="width:100%;border-radius:6px">';
+    modC.innerHTML='<img src="/api/preview/'+fname+'" style="width:100%;border-radius:6px">';
   }
   document.getElementById('prev-idx').textContent=(fileIdx+1)+'/'+prevGroups.length;
   document.getElementById('var-idx').textContent=(varIdx+1)+'/'+g.variants.length;
@@ -2880,18 +2839,17 @@ function varNav(dir){
   const modC=document.getElementById('prev-mod');
   const isVid=fname.endsWith('.mp4');
   if(isVid){
-    modC.innerHTML='<video src="'+apiUrl('/api/preview/'+fname)+'" style="width:100%;border-radius:6px" controls muted></video>';
+    modC.innerHTML='<video src="/api/preview/'+fname+'" style="width:100%;border-radius:6px" controls muted></video>';
   }else{
-    modC.innerHTML='<img src="'+apiUrl('/api/preview/'+fname)+'" style="width:100%;border-radius:6px">';
+    modC.innerHTML='<img src="/api/preview/'+fname+'" style="width:100%;border-radius:6px">';
   }
   document.getElementById('var-idx').textContent=(varIdx+1)+'/'+prevGroups[fileIdx].variants.length;
 }
 
 /* Folder picker */
 async function pickFolder(targetId){
-  const r=await(await fetch(apiUrl('/api/pick-folder?target='+targetId))).json();
-  if(r&&r.folder) document.getElementById(targetId).value=r.folder;
-  else alert('En mode web, utilise le glisser-d\u00e9poser des fichiers dans la zone ci-dessus.');
+  const r=await(await fetch('/api/pick-folder')).json();
+  if(r.folder) document.getElementById(targetId).value=r.folder;
 }
 
 /* Drag & Drop files — batch with preview */
@@ -2906,26 +2864,18 @@ async function handleDrop(e){
   showDroppedFiles();
   document.getElementById('dz-text').style.display='none';
   const ok=document.getElementById('dz-ok');ok.style.display='block';ok.textContent='Envoi de '+files.length+' fichiers...';
-  try{
-    let r=await fetch(apiUrl('/api/upload-clear'),{method:'POST'});
-    if(!r.ok){throw new Error('Erreur '+(r.status===401?'session expirée — rafraîchis depuis le dashboard':r.status));}
-    let sent=0;
-    for(const f of droppedFiles){
-      r=await fetch(apiUrl('/api/upload-file'),{method:'POST',headers:{'X-Filename':encodeURIComponent(f.name),'Content-Length':f.size},body:f});
-      if(!r.ok){throw new Error('Erreur upload '+(r.status===401?'session expirée':r.status));}
-      sent++;ok.textContent=sent+'/'+droppedFiles.length+' fichiers envoyés...';
-      updateDroppedFileStatus(f.name,'ok');
-    }
-    const data=await(await fetch(apiUrl('/api/upload-done'))).json();
-    if(!data||!data.folder){throw new Error('Impossible de récupérer le dossier');}
-    document.getElementById('idir').value=data.folder;
-    ok.textContent='✅ '+droppedFiles.length+' fichiers prêts';
-    dz.style.borderColor='var(--grn)';
-  }catch(err){
-    ok.textContent='❌ Erreur';
-    dz.style.borderColor='var(--red)';
-    alert(err.message||'Erreur lors de l\'envoi des fichiers.');
+  // Clear temp folder first
+  await fetch('/api/upload-clear',{method:'POST'});
+  let sent=0;
+  for(const f of droppedFiles){
+    await fetch('/api/upload-file',{method:'POST',headers:{'X-Filename':encodeURIComponent(f.name),'Content-Length':f.size},body:f});
+    sent++;ok.textContent=sent+'/'+droppedFiles.length+' fichiers envoyés...';
+    updateDroppedFileStatus(f.name,'ok');
   }
+  const r=await(await fetch('/api/upload-done')).json();
+  document.getElementById('idir').value=r.folder;
+  ok.textContent='✅ '+droppedFiles.length+' fichiers prêts';
+  dz.style.borderColor='var(--grn)';
   setTimeout(()=>{dz.style.borderColor='var(--br)';dz.style.background='none'},2000);
 }
 function showDroppedFiles(){
@@ -3003,7 +2953,7 @@ function notifyDesktop(title,body){
 initNotifications();
 
 /* Uniquifier */
-async function ck(){const r=await(await fetch(apiUrl('/api/status'))).json();if(!r.ffmpeg){document.getElementById('fw').style.display='block';document.getElementById('fs').innerHTML=r.fi.steps.map(s=>'<p>'+s+'</p>').join('')}}
+async function ck(){const r=await(await fetch('/api/status')).json();if(!r.ffmpeg){document.getElementById('fw').style.display='block';document.getElementById('fs').innerHTML=r.fi.steps.map(s=>'<p>'+s+'</p>').join('')}}
 async function go(){const b=document.getElementById('sb');b.disabled=true;b.innerHTML='<span class="sp"></span>Traitement en cours...';
 document.getElementById('pc').classList.add('on');document.getElementById('rc').classList.remove('on');document.getElementById('pl').innerHTML='';
 document.getElementById('proc-controls').classList.remove('hide');
@@ -3011,11 +2961,9 @@ document.getElementById('preview-zone').style.display='none';
 document.getElementById('pause-btn').innerHTML='⏸ Pause';
 document.getElementById('eta-display').textContent='';
 const d={input_dir:document.getElementById('idir').value,output_dir:document.getElementById('odir').value,variants:parseInt(document.getElementById('nv').value)||10,workers:parseInt(document.getElementById('nw').value)||4,rename:document.getElementById('rn').checked,double_process:document.getElementById('dbl').checked,stealth:document.getElementById('stealth').checked,naming_template:document.getElementById('ntpl')?document.getElementById('ntpl').value.trim():'',dest:destMode,gdrive_folder_id:document.getElementById('gd-folder-id')?document.getElementById('gd-folder-id').value.trim():'',tg_chat_id:document.getElementById('tg-chat-id')?document.getElementById('tg-chat-id').value.trim():'',tg_topic_id:document.getElementById('tg-topic-id')?document.getElementById('tg-topic-id').value.trim():''};
-let startR;try{const res=await fetch(apiUrl('/api/start'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});if(!res.ok){if(res.status===401)alert('Session expirée. Va sur le dashboard et clique « Ouvrir le bot » pour un nouveau lien.');else if(res.status===403)alert('Quota dépassé.');else alert('Erreur '+res.status);startR={error:true}}else{startR=await res.json()}}catch(e){startR={error:true};alert('Erreur: '+e.message)}
-if(startR&&!startR.error){poll=setInterval(pp,400)}else{const b=document.getElementById('sb');if(b){b.disabled=false;b.innerHTML='Lancer le traitement';document.getElementById('pc').classList.remove('on');document.getElementById('proc-controls').classList.add('hide');}if(startR&&startR.error&&startR.error!==true)alert(startR.error)}
+await fetch('/api/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});poll=setInterval(pp,400)}
 
-async function pp(){let d;try{d=await(await fetch(apiUrl('/api/progress'))).json();}catch(e){if(poll)clearInterval(poll);poll=null;const b=document.getElementById('sb');if(b){b.disabled=false;b.innerHTML='Lancer le traitement';}alert('Erreur: '+e.message);return;}
-if(!d)return;
+async function pp(){const d=await(await fetch('/api/progress')).json();
 const p=d.total>0?(d.progress/d.total*100):0;document.getElementById('pf').style.width=p+'%';
 document.getElementById('ps').textContent=d.progress+' / '+d.total;document.getElementById('pt').textContent=d.file||'Traitement...';
 if(d.eta)document.getElementById('eta-display').textContent=d.eta+' restantes';
@@ -3028,7 +2976,7 @@ if(d.queue&&d.queue.length>0){
     return '<div style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:10px"><span>'+icons[q.status]+'</span><span style="color:'+colors[q.status]+';flex:1">'+q.name+'</span><span style="color:var(--mut)">'+q.type+'</span></div>';
   }).join('');
 }
-const l=document.getElementById('pl');l.innerHTML=(d.log||[]).map(e=>{const c=e.l==='ok'?'lo':e.l==='error'?'le':'li';return'<div><span class="lt">['+e.t+']</span><span class="'+c+'">'+e.m+'</span></div>'}).join('');l.scrollTop=l.scrollHeight;
+const l=document.getElementById('pl');l.innerHTML=d.log.map(e=>{const c=e.l==='ok'?'lo':e.l==='error'?'le':'li';return'<div><span class="lt">['+e.t+']</span><span class="'+c+'">'+e.m+'</span></div>'}).join('');l.scrollTop=l.scrollHeight;
 if(d.done){clearInterval(poll);const b=document.getElementById('sb');b.disabled=false;b.innerHTML='Lancer le traitement';
 document.getElementById('proc-controls').classList.add('hide');
 document.getElementById('rc').classList.add('on');document.getElementById('rn2').textContent=d.results.length;
@@ -3042,13 +2990,13 @@ saveCfg();}}
 
 /* Pause / Cancel */
 async function togglePause(){
-  const r=await(await fetch(apiUrl('/api/pause'))).json();
+  const r=await(await fetch('/api/pause')).json();
   document.getElementById('pause-btn').innerHTML=r.paused?'▶ Reprendre':'⏸ Pause';
   document.getElementById('pt').textContent=r.paused?'⏸ En pause...':document.getElementById('pt').textContent;
 }
 async function cancelJob(){
   if(!confirm('Annuler le traitement en cours ?'))return;
-  await fetch(apiUrl('/api/cancel'));
+  await fetch('/api/cancel');
 }
 
 /* Preview */
@@ -3058,22 +3006,22 @@ async function genPreview(){
   document.getElementById('preview-btn').disabled=true;
   document.getElementById('preview-btn').innerHTML='⏳...';
   try{
-    const r=await(await fetch(apiUrl('/api/preview'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({input_dir:idir})})).json();
-    if(!r||r.error){alert(r&&r.error?r.error:'Erreur preview');return}
+    const r=await(await fetch('/api/preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({input_dir:idir})})).json();
+    if(r.error){alert(r.error);return}
     const pz=document.getElementById('preview-zone');pz.style.display='block';
     const orig=document.getElementById('pv-orig');const vari=document.getElementById('pv-var');
     if(r.type==='image'){
-      orig.innerHTML='<img src="'+apiUrl('/api/file?p='+encodeURIComponent(r.original))+'" style="max-width:100%;max-height:200px">';
-      vari.innerHTML='<img src="'+apiUrl('/api/file?p='+encodeURIComponent(r.variant))+'" style="max-width:100%;max-height:200px">';
+      orig.innerHTML='<img src="/api/file?p='+encodeURIComponent(r.original)+'" style="max-width:100%;max-height:200px">';
+      vari.innerHTML='<img src="/api/file?p='+encodeURIComponent(r.variant)+'" style="max-width:100%;max-height:200px">';
     }else{
-      orig.innerHTML='<video src="'+apiUrl('/api/file?p='+encodeURIComponent(r.original))+'" controls style="max-width:100%;max-height:200px"></video>';
-      vari.innerHTML='<video src="'+apiUrl('/api/file?p='+encodeURIComponent(r.variant))+'" controls style="max-width:100%;max-height:200px"></video>';
+      orig.innerHTML='<video src="/api/file?p='+encodeURIComponent(r.original)+'" controls style="max-width:100%;max-height:200px"></video>';
+      vari.innerHTML='<video src="/api/file?p='+encodeURIComponent(r.variant)+'" controls style="max-width:100%;max-height:200px"></video>';
     }
   }catch(e){alert('Erreur preview: '+e)}
   finally{document.getElementById('preview-btn').disabled=false;document.getElementById('preview-btn').innerHTML='👁 Preview'}
 }
-function op(){window.location.href=apiUrl('/api/download-zip')}
-function oz(){window.location.href=apiUrl('/api/download-zip')}
+async function op(){await fetch('/api/open-output')}
+async function oz(){await fetch('/api/open-zip')}
 
 /* Destination toggle */
 let destMode='local';
@@ -3106,7 +3054,7 @@ function gdConnect(){
         if(d.email) document.getElementById('gd-user-email').textContent='✅ '+d.email;
       }).catch(()=>{});
       // Save token to backend
-      fetch(apiUrl('/api/gdrive-token'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:gdOAuthToken})});
+      fetch('/api/gdrive-token',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:gdOAuthToken})});
       window.removeEventListener('message',handler);
     }
   });
@@ -3116,7 +3064,7 @@ function gdPollUpload(){
   document.getElementById('gd-status').textContent='Upload vers Drive...';
   document.getElementById('gd-fill').style.width='0%';
   const gi=setInterval(async()=>{
-    const d=await(await fetch(apiUrl('/api/gdrive-progress'))).json();
+    const d=await(await fetch('/api/gdrive-progress')).json();
     const p=d.total>0?(d.progress/d.total*100):0;
     document.getElementById('gd-fill').style.width=p+'%';
     document.getElementById('gd-status').textContent=d.error?'❌ '+d.error:d.done?'✅ '+d.files_uploaded+' fichiers uploadés sur Drive !':d.progress+'/'+d.total+' fichiers...';
@@ -3128,7 +3076,7 @@ function tgPollUpload(){
   document.getElementById('tg-status').textContent='Envoi sur Telegram...';
   document.getElementById('tg-fill').style.width='0%';
   const gi=setInterval(async()=>{
-    const d=await(await fetch(apiUrl('/api/tg-send-progress'))).json();
+    const d=await(await fetch('/api/tg-send-progress')).json();
     const p=d.total>0?(d.progress/d.total*100):0;
     document.getElementById('tg-fill').style.width=p+'%';
     document.getElementById('tg-status').textContent=d.error?'❌ '+d.error:d.done?'✅ '+d.files_sent+' fichiers envoyés sur Telegram !':d.progress+'/'+d.total+' fichiers...';
@@ -3146,11 +3094,11 @@ async function goScrape(){
   document.getElementById('slog').classList.add('on');document.getElementById('slog').innerHTML='';
   document.getElementById('sdone').classList.remove('on');
   const d={api_key:key,username:user,max_posts:parseInt(document.getElementById('smax').value)||50,skip_reels:document.getElementById('sskip').checked,output_base:document.getElementById('sout').value.trim(),days_filter:parseInt(document.getElementById('speriod').value)||0,min_likes:parseInt(document.getElementById('sminlikes').value)||0};
-  await fetch(apiUrl('/api/scrape'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});
+  await fetch('/api/scrape',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});
   spoll=setInterval(spp,500);
 }
 async function spp(){
-  const d=await(await fetch(apiUrl('/api/scrape-progress'))).json();
+  const d=await(await fetch('/api/scrape-progress')).json();
   const p=d.total>0?(d.downloaded/d.total*100):0;
   document.getElementById('sfill').style.width=p+'%';
   document.getElementById('snum').textContent=d.downloaded+'/'+d.total;
@@ -3185,11 +3133,11 @@ async function goTT(){
   document.getElementById('ttlog').classList.add('on');document.getElementById('ttlog').innerHTML='';
   document.getElementById('ttdone').classList.remove('on');
   const d={api_key:key,username:user,max_videos:parseInt(document.getElementById('ttmax').value)||50,output_base:document.getElementById('ttout').value.trim()};
-  await fetch(apiUrl('/api/tt-scrape'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});
+  await fetch('/api/tt-scrape',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});
   ttpoll=setInterval(ttpp,500);
 }
 async function ttpp(){
-  const d=await(await fetch(apiUrl('/api/tt-progress'))).json();
+  const d=await(await fetch('/api/tt-progress')).json();
   const p=d.total>0?(d.downloaded/d.total*100):0;
   document.getElementById('ttfill').style.width=p+'%';
   document.getElementById('ttnum').textContent=d.downloaded+'/'+d.total;
@@ -3221,16 +3169,16 @@ async function addSchJob(){
   const val=parseInt(document.getElementById('sch-val').value)||24;
   const unit=document.getElementById('sch-unit').value;
   const hours=unit==='d'?val*24:val;
-  const cfg=await(await fetch(apiUrl('/api/config'))).json();
+  const cfg=await(await fetch('/api/config')).json();
   const key=plat==='ig'?cfg.ig_key:cfg.tt_key;
   if(!key){alert('Sauvegarde d\'abord ta clé API '+plat.toUpperCase()+' dans l\'onglet scraper');return}
   const job={platform:plat,username:user.replace('@',''),api_key:key,interval_h:hours,max_posts:parseInt(document.getElementById('sch-max').value)||50,skip_reels:document.getElementById('sch-skip').checked};
-  await fetch(apiUrl('/api/scheduler-add'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(job)});
+  await fetch('/api/scheduler-add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(job)});
   document.getElementById('sch-user').value='';
   loadScheduler();
 }
 async function loadScheduler(){
-  const d=await(await fetch(apiUrl('/api/scheduler'))).json();
+  const d=await(await fetch('/api/scheduler')).json();
   const el=document.getElementById('sch-list');
   if(!d.jobs||!d.jobs.length){el.innerHTML='Aucun job programmé';return}
   el.innerHTML=d.jobs.map(j=>{
@@ -3243,20 +3191,20 @@ async function loadScheduler(){
   }).join('');
 }
 async function toggleSch(id){
-  await fetch(apiUrl('/api/scheduler-toggle'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});
+  await fetch('/api/scheduler-toggle',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});
   loadScheduler();loadDash();
 }
 async function removeSch(id){
   if(!confirm('Supprimer ce job ?')) return;
-  await fetch(apiUrl('/api/scheduler-remove'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});
+  await fetch('/api/scheduler-remove',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});
   loadScheduler();loadDash();
 }
 
 /* Dashboard */
 async function loadDash(){
   try{
-    const s=await(await fetch(apiUrl('/api/stats'))).json();
-    const sc=await(await fetch(apiUrl('/api/scheduler'))).json();
+    const s=await(await fetch('/api/stats')).json();
+    const sc=await(await fetch('/api/scheduler')).json();
     document.getElementById('st-variants').textContent=s.total_variants||0;
     document.getElementById('st-scrapes').textContent=s.total_scrapes||0;
     document.getElementById('st-jobs').textContent=(sc.jobs||[]).filter(j=>j.active).length;
@@ -3285,7 +3233,7 @@ async function simUpload(f,slot){
   const el=document.getElementById('sim-name'+slot);
   const short=f.name.length>35?f.name.substring(0,32)+'...':f.name;
   el.style.display='block';el.textContent='⏳ '+short;
-  await fetch(apiUrl('/api/sim-upload'),{method:'POST',headers:{'X-Filename':encodeURIComponent(f.name),'X-Slot':slot,'Content-Length':f.size},body:f});
+  await fetch('/api/sim-upload',{method:'POST',headers:{'X-Filename':encodeURIComponent(f.name),'X-Slot':slot,'Content-Length':f.size},body:f});
   simFiles[slot]=f.name;
   el.textContent='✅ '+short;
   document.getElementById('sim-drop'+slot).style.borderColor='var(--grn)';
@@ -3294,11 +3242,11 @@ async function simCheck(){
   if(!simFiles[1]||!simFiles[2]){alert('Uploade 2 fichiers');return}
   const btn=document.getElementById('sim-btn');btn.disabled=true;btn.innerHTML='<span class="sp"></span>Analyse...';
   document.getElementById('sim-result').style.display='none';
-  const r=await(await fetch(apiUrl('/api/sim-check'),{method:'POST'})).json();
+  const r=await(await fetch('/api/sim-check',{method:'POST'})).json();
   if(r.error){alert(r.error);btn.disabled=false;btn.textContent='Analyser la similarité';return}
   // Poll for result
   const poll=setInterval(async()=>{
-    const s=await(await fetch(apiUrl('/api/sim-status'))).json();
+    const s=await(await fetch('/api/sim-status')).json();
     if(!s.active&&s.result){
       clearInterval(poll);
       btn.disabled=false;btn.textContent='Analyser la similarité';
@@ -3324,10 +3272,10 @@ async function batchSim(){
   const orig=document.getElementById('bsim-orig').value.trim();
   const vdir=document.getElementById('bsim-dir').value.trim();
   if(!orig||!vdir){alert('Remplis les 2 champs');return}
-  const r=await(await fetch(apiUrl('/api/sim-batch'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({original:orig,variants_dir:vdir})})).json();
+  const r=await(await fetch('/api/sim-batch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({original:orig,variants_dir:vdir})})).json();
   if(r.error){alert(r.error);return}
   const poll=setInterval(async()=>{
-    const s=await(await fetch(apiUrl('/api/sim-status'))).json();
+    const s=await(await fetch('/api/sim-status')).json();
     if(!s.active&&s.result){
       clearInterval(poll);
       const d=s.result;
@@ -3350,9 +3298,9 @@ async function batchSim(){
 /* Telegram Bot */
 async function loadTgStatus(){
   try{
-    const r=await(await fetch(apiUrl('/api/tg-status'))).json();
+    const r=await(await fetch('/api/tg-status')).json();
     const bar=document.getElementById('tg-status-bar');
-    const cfg=await(await fetch(apiUrl('/api/config'))).json();
+    const cfg=await(await fetch('/api/config')).json();
     if(cfg.tg_bot_token) document.getElementById('tg-token').value=cfg.tg_bot_token;
     if(cfg.tg_variants) document.getElementById('tg-nv').value=cfg.tg_variants;
     if(cfg.tg_max_variants) document.getElementById('tg-mx').value=cfg.tg_max_variants;
@@ -3380,20 +3328,20 @@ async function tgConnect(){
   const authStr=document.getElementById('tg-auth').value.trim();
   const auth=authStr?authStr.split(',').map(s=>parseInt(s.trim())).filter(n=>!isNaN(n)):[];
   const btn=document.getElementById('tg-conn-btn');btn.disabled=true;btn.innerHTML='<span class="sp"></span>Connexion...';
-  const r=await(await fetch(apiUrl('/api/tg-connect'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token,variants:nv,max_variants:mx,authorized:auth})})).json();
+  const r=await(await fetch('/api/tg-connect',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token,variants:nv,max_variants:mx,authorized:auth})})).json();
   btn.disabled=false;btn.innerHTML='Reconnecter';
   loadTgStatus();
 }
 async function tgDisconnect(){
   if(!confirm('Déconnecter le bot Telegram ?')) return;
-  await fetch(apiUrl('/api/tg-disconnect'),{method:'POST'});
+  await fetch('/api/tg-disconnect',{method:'POST'});
   document.getElementById('tg-disc-btn').disabled=true;
   loadTgStatus();
 }
 
 /* API key */
 async function loadApiKey(){
-  try{const r=await(await fetch(apiUrl('/api/api-key'))).json();document.getElementById('api-key-display').value=r.key||''}catch(e){}
+  try{const r=await(await fetch('/api/api-key')).json();document.getElementById('api-key-display').value=r.key||''}catch(e){}
 }
 function copyApiKey(){
   const el=document.getElementById('api-key-display');el.select();document.execCommand('copy');
@@ -3401,12 +3349,12 @@ function copyApiKey(){
 }
 async function regenApiKey(){
   if(!confirm('Régénérer la clé API ? L\'ancienne ne fonctionnera plus.')) return;
-  const r=await(await fetch(apiUrl('/api/api-key-regen'))).json();
+  const r=await(await fetch('/api/api-key-regen')).json();
   document.getElementById('api-key-display').value=r.key||'';
 }
 
 ck();loadCfg();loadPresets();loadScheduler();loadDash();loadApiKey();loadTgStatus();
-fetch(apiUrl('/api/tg-bot-status')).then(r=>r.json()).then(d=>{if(d.username&&document.getElementById('tg-bot-name'))document.getElementById('tg-bot-name').textContent='@'+d.username;}).catch(()=>{});
+fetch('/api/tg-bot-status').then(r=>r.json()).then(d=>{if(d.username&&document.getElementById('tg-bot-name'))document.getElementById('tg-bot-name').textContent='@'+d.username;}).catch(()=>{});
 document.getElementById('stealth').addEventListener('change',function(){if(this.checked){document.getElementById('dbl').checked=true}});
 // ═══ Keyboard shortcuts ═══
 document.addEventListener('keydown',function(e){
@@ -3428,7 +3376,7 @@ async function wmEmbed(){
   const img=document.getElementById('wm-img').value.trim();
   const msg=document.getElementById('wm-msg').value.trim();
   if(!img||!msg){alert('Remplis image + message');return}
-  const r=await(await fetch(apiUrl('/api/watermark-embed'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image:img,message:msg})})).json();
+  const r=await(await fetch('/api/watermark-embed',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image:img,message:msg})})).json();
   const d=document.getElementById('wm-result');d.style.display='block';
   if(r.ok) d.innerHTML='<span style="color:var(--grn)">✅ Watermark encodé !</span> '+r.bits+' bits dans '+r.file;
   else d.innerHTML='<span style="color:var(--red)">❌ '+r.e+'</span>';
@@ -3436,7 +3384,7 @@ async function wmEmbed(){
 async function wmRead(){
   const img=document.getElementById('wm-img').value.trim();
   if(!img){alert('Remplis le chemin image');return}
-  const r=await(await fetch(apiUrl('/api/watermark-read'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image:img})})).json();
+  const r=await(await fetch('/api/watermark-read',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image:img})})).json();
   const d=document.getElementById('wm-result');d.style.display='block';
   if(r.ok) d.innerHTML='<span style="color:var(--teal2)">🔍 Message trouvé :</span> <code>'+r.message+'</code>';
   else d.innerHTML='<span style="color:var(--red)">❌ '+r.e+'</span>';
@@ -3456,11 +3404,11 @@ async function dcConnect(){
   const auth=document.getElementById('dc-auth').value.trim();
   if(!token){alert('Colle le token Discord');return}
   const channels=auth?auth.split(',').map(s=>s.trim()).filter(Boolean):[];
-  await fetch(apiUrl('/api/save-config'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dc_bot_token:token,dc_authorized_channels:channels})});
-  await fetch(apiUrl('/api/dc-start'),{method:'POST'});
+  await fetch('/api/save-config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dc_bot_token:token,dc_authorized_channels:channels})});
+  await fetch('/api/dc-start',{method:'POST'});
   const sb=document.getElementById('dc-status-bar');sb.style.display='block';sb.style.background='rgba(14,165,199,.1)';sb.style.color='var(--teal2)';sb.textContent='🎮 Connexion en cours...';
   setTimeout(async()=>{
-    const r=await(await fetch(apiUrl('/api/dc-status'))).json();
+    const r=await(await fetch('/api/dc-status')).json();
     if(r.active){sb.style.background='rgba(52,211,153,.1)';sb.style.color='var(--grn)';sb.textContent='✅ Bot Discord @'+r.username+' connecté';}
     else{sb.style.background='rgba(248,113,113,.1)';sb.style.color='var(--red)';sb.textContent='❌ '+(r.error||'Erreur de connexion');}
   },3000);
@@ -3570,10 +3518,6 @@ function setLang(lang){
 # ─── Server ───
 class H(BaseHTTPRequestHandler):
     def log_message(self,*a): pass
-    def _set_saas_user(self):
-        global saas_user_id
-        uid=self.headers.get("X-User-Id")
-        if uid: saas_user_id=uid
     def do_OPTIONS(self):
         self.send_response(200)
         self.send_header("Access-Control-Allow-Origin","*")
@@ -3581,18 +3525,16 @@ class H(BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Methods","GET, POST, OPTIONS")
         self.end_headers()
     def do_GET(self):
-        self._set_saas_user()
-        path_only=self.path.split("?")[0]
-        if path_only in["/","/index.html"]: self._html(HTML)
-        elif path_only=="/manifest.json":
+        if self.path in["/","/index.html"]: self._html(HTML)
+        elif self.path=="/manifest.json":
             m=json.dumps({"name":"ZyChad Meta","short_name":"ZyChad","start_url":"/","display":"standalone","background_color":"#0a0f1c","theme_color":"#0ea5c7","icons":[{"src":"/icon-192.png","sizes":"192x192","type":"image/png"}]})
             self.send_response(200)
             self.send_header("Content-Type","application/json")
             self.end_headers()
             self.wfile.write(m.encode())
             return
-        elif path_only=="/api/status": self._json({"ffmpeg":FFMPEG_PATH is not None,"fp":FFMPEG_PATH,"fi":ffmpeg_install_info()})
-        elif path_only=="/api/progress":
+        elif self.path=="/api/status": self._json({"ffmpeg":FFMPEG_PATH is not None,"fp":FFMPEG_PATH,"fi":ffmpeg_install_info()})
+        elif self.path=="/api/progress":
             import re as _re
             # Group results by original file
             preview_groups={}  # orig_name -> [variant_filenames]
@@ -3603,23 +3545,17 @@ class H(BaseHTTPRequestHandler):
             # Sort groups and variants
             preview_sorted=[{"orig":k,"variants":sorted(v)} for k,v in sorted(preview_groups.items())]
             self._json({"active":state["active"],"progress":state["progress"],"total":state["total"],"file":state["file"],"log":state["log"][-150:],"results":state["results"],"done":state["done"],"zip":state["zip"],"input":state.get("input",""),"preview":preview_sorted,"gdrive_uploading":gdrive_state.get("uploading",False),"gdrive_done":gdrive_state.get("done",False),"gdrive_error":gdrive_state.get("error",""),"tg_uploading":tg_send_state.get("uploading",False),"tg_done":tg_send_state.get("done",False),"tg_error":tg_send_state.get("error",""),"paused":state.get("paused",False),"cancelled":state.get("cancelled",False),"eta":state.get("eta",""),"queue":state.get("files_list",[])})
-        elif path_only=="/api/scrape-progress": self._json({"active":scrape_state["active"],"done":scrape_state["done"],"downloaded":scrape_state["downloaded"],"total":scrape_state["total"],"folder":scrape_state["folder"],"log":scrape_state["log"][-50:]})
-        elif path_only=="/api/tt-progress": self._json({"active":tt_state["active"],"done":tt_state["done"],"downloaded":tt_state["downloaded"],"total":tt_state["total"],"folder":tt_state["folder"],"log":tt_state["log"][-50:]})
-        elif path_only=="/api/config":
-            cfg=load_config()
-            uid=self.headers.get("X-User-Id")
-            if uid:
-                us=load_user_settings(uid)
-                if us: cfg.update(us)
-            self._json(cfg)
-        elif path_only=="/api/api-key": self._json({"key":get_api_key()})
-        elif path_only=="/api/api-key-regen":
+        elif self.path=="/api/scrape-progress": self._json({"active":scrape_state["active"],"done":scrape_state["done"],"downloaded":scrape_state["downloaded"],"total":scrape_state["total"],"folder":scrape_state["folder"],"log":scrape_state["log"][-50:]})
+        elif self.path=="/api/tt-progress": self._json({"active":tt_state["active"],"done":tt_state["done"],"downloaded":tt_state["downloaded"],"total":tt_state["total"],"folder":tt_state["folder"],"log":tt_state["log"][-50:]})
+        elif self.path=="/api/config": self._json(load_config())
+        elif self.path=="/api/api-key": self._json({"key":get_api_key()})
+        elif self.path=="/api/api-key-regen":
             key=generate_api_key(); save_config({"api_key":key}); self._json({"key":key})
-        elif path_only=="/api/tg-status":
+        elif self.path=="/api/tg-status":
             self._json({"active":tg_bot_state["active"],"username":tg_bot_state["username"],"error":tg_bot_state["error"]})
-        elif path_only=="/api/sim-status":
+        elif self.path=="/api/sim-status":
             self._json({"active":sim_state["active"],"result":sim_state["result"]})
-        elif path_only=="/api/dc-status":
+        elif self.path=="/api/dc-status":
             self._json({"active":dc_bot_state["active"],"username":dc_bot_state["username"],"error":dc_bot_state["error"]})
         # ── External API (requires X-API-Key) ──
         elif self.path=="/ext/status":
@@ -3651,14 +3587,14 @@ class H(BaseHTTPRequestHandler):
                 self.send_response(200); self.send_header("Content-Type",ct); self.send_header("Content-Disposition",f"attachment; filename={fname}"); self.send_header("Content-Length",str(fp.stat().st_size)); self.end_headers()
                 with open(fp,"rb") as f: self.wfile.write(f.read())
             else: self._json_err(404,"File not found")
-        elif path_only=="/api/gdrive-progress":
+        elif self.path=="/api/gdrive-progress":
             self._json(gdrive_state)
-        elif path_only=="/api/tg-send-progress":
+        elif self.path=="/api/tg-send-progress":
             self._json(tg_send_state)
-        elif path_only=="/api/pause":
+        elif self.path=="/api/pause":
             state["paused"]=not state.get("paused",False)
             self._json({"paused":state["paused"]})
-        elif path_only=="/api/cancel":
+        elif self.path=="/api/cancel":
             state["cancelled"]=True; state["paused"]=False
             self._json({"cancelled":True})
         elif self.path.startswith("/api/file"):
@@ -3681,8 +3617,8 @@ else{document.body.innerHTML='<h2 style="font-family:sans-serif;text-align:cente
 </script></body></html>"""
             self.send_response(200); self.send_header("Content-Type","text/html"); self.end_headers()
             self.wfile.write(html.encode())
-        elif path_only=="/api/stats": self._json(load_stats())
-        elif path_only=="/api/scheduler": self._json({"jobs":scheduler_jobs})
+        elif self.path=="/api/stats": self._json(load_stats())
+        elif self.path=="/api/scheduler": self._json({"jobs":scheduler_jobs})
         elif self.path.startswith("/api/original/"):
             # Serve original input file for preview comparison
             fname=self.path[len("/api/original/"):]
@@ -3712,67 +3648,36 @@ else{document.body.innerHTML='<h2 style="font-family:sans-serif;text-align:cente
                 self.send_response(200); self.send_header("Content-Type",ct); self.send_header("Content-Length",str(fp.stat().st_size)); self.end_headers()
                 with open(fp,"rb") as f: self.wfile.write(f.read())
             else: self.send_response(404); self.end_headers()
-        elif self.path.startswith("/api/pick-folder"):
+        elif self.path=="/api/pick-folder":
             folder=""
-            uid=self.headers.get("X-User-Id")
-            # SaaS: pas de GUI en Docker → retourner chemins par défaut
-            if uid:
-                qs=urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
-                target=qs.get("target",[""])[0]
-                tmp=str(Path(tempfile.gettempdir()))
-                if target=="idir": folder=tmp+"/zychad_drop"
-                elif target=="odir": folder=tmp+"/zychad_output"
-                else: folder=tmp+"/zychad_output"
-            else:
-                try:
-                    import tkinter as tk
-                    from tkinter import filedialog
-                    root=tk.Tk(); root.withdraw(); root.attributes("-topmost",True)
-                    folder=filedialog.askdirectory(title="Sélectionne un dossier")
-                    root.destroy()
-                except: pass
+            try:
+                import tkinter as tk
+                from tkinter import filedialog
+                root=tk.Tk(); root.withdraw(); root.attributes("-topmost",True)
+                folder=filedialog.askdirectory(title="Sélectionne un dossier")
+                root.destroy()
+            except: pass
             self._json({"folder":folder})
         elif self.path.startswith("/api/upload-done"):
             # Return the temp upload folder path
             self._json({"folder":str(Path(tempfile.gettempdir())/"zychad_drop")})
-        elif path_only=="/api/download-zip":
-            z=state.get("zip")
-            if z and Path(z).exists():
-                zp=Path(z)
-                self.send_response(200)
-                self.send_header("Content-Type","application/zip")
-                self.send_header("Content-Disposition",f'attachment; filename="{zp.name}"')
-                self.send_header("Content-Length",str(zp.stat().st_size))
-                self.end_headers()
-                with open(zp,"rb") as f: self.wfile.write(f.read())
-            else:
-                self.send_response(404)
-                self.send_header("Content-Type","text/html; charset=utf-8")
-                self.end_headers()
-                self.wfile.write(b"<html><body style='font-family:sans-serif;padding:2rem;text-align:center'><h2>Aucun ZIP disponible</h2><p>Lance un traitement et attends la fin pour t&eacute;l&eacute;charger le ZIP.</p><a href='/'>Retour</a></body></html>")
-        elif path_only=="/api/open-output":
+        elif self.path=="/api/open-output":
             o=state.get("output","")
             if o and Path(o).exists():
-                try:
-                    if platform.system()=="Windows": os.startfile(o)
-                    elif platform.system()=="Darwin": subprocess.run(["open",o])
-                    else: subprocess.run(["xdg-open",o])
-                except (FileNotFoundError, OSError): pass  # Headless/Docker: pas de gestionnaire de fichiers
+                if platform.system()=="Windows": os.startfile(o)
+                elif platform.system()=="Darwin": subprocess.run(["open",o])
+                else: subprocess.run(["xdg-open",o])
             self._json({"ok":True})
-        elif path_only=="/api/open-zip":
+        elif self.path=="/api/open-zip":
             z=state.get("zip")
             if z and Path(z).exists():
-                try:
-                    if platform.system()=="Windows": os.startfile(str(Path(z).parent))
-                    elif platform.system()=="Darwin": subprocess.run(["open","-R",z])
-                    else: subprocess.run(["xdg-open",str(Path(z).parent)])
-                except (FileNotFoundError, OSError): pass  # Headless/Docker: pas de gestionnaire de fichiers
+                if platform.system()=="Windows": os.startfile(str(Path(z).parent))
+                elif platform.system()=="Darwin": subprocess.run(["open","-R",z])
+                else: subprocess.run(["xdg-open",str(Path(z).parent)])
             self._json({"ok":True})
         else: self.send_response(404); self.end_headers()
     def do_POST(self):
-        self._set_saas_user()
-        path_only=self.path.split("?")[0]
-        if path_only=="/api/upload-file":
+        if self.path=="/api/upload-file":
             # Receive a single file via multipart-like simple upload
             cl=int(self.headers.get("Content-Length",0))
             fname=urllib.parse.unquote(self.headers.get("X-Filename","file"))
@@ -3782,13 +3687,13 @@ else{document.body.innerHTML='<h2 style="font-family:sans-serif;text-align:cente
             fp=drop_dir/fname
             with open(fp,"wb") as f: f.write(data)
             self._json({"ok":True,"path":str(fp)})
-        elif path_only=="/api/upload-clear":
+        elif self.path=="/api/upload-clear":
             # Clear temp drop folder for fresh drop
             drop_dir=Path(tempfile.gettempdir())/"zychad_drop"
             if drop_dir.exists(): shutil.rmtree(drop_dir)
             drop_dir.mkdir(parents=True,exist_ok=True)
             self._json({"ok":True})
-        elif path_only=="/api/scrape":
+        elif self.path=="/api/scrape":
             b=json.loads(self.rfile.read(int(self.headers.get("Content-Length",0))))
             if scrape_state["active"]: self._json({"error":"busy"}); return
             ak=b.get("api_key","").strip(); un=b.get("username","").strip(); mp=b.get("max_posts",50); sr=b.get("skip_reels",True)
@@ -3808,35 +3713,30 @@ else{document.body.innerHTML='<h2 style="font-family:sans-serif;text-align:cente
             else:
                 threading.Thread(target=run_scrape,args=(ak,usernames[0] if usernames else un,mp,sr,ob,df,ml),daemon=True).start()
             self._json({"ok":True})
-        elif path_only=="/api/gdrive-token":
+        elif self.path=="/api/gdrive-token":
             b=json.loads(self.rfile.read(int(self.headers.get("Content-Length",0))))
             gdrive_token["access_token"]=b.get("token","")
             self._json({"ok":True})
-        elif path_only=="/api/preview":
+        elif self.path=="/api/preview":
             b=json.loads(self.rfile.read(int(self.headers.get("Content-Length",0))))
             i=b.get("input_dir","")
             if not i: self._json({"error":"No input"}); return
             o=str(Path(i).parent/"_zychad_preview")
             r=run_preview(i,o)
             self._json(r)
-        elif path_only=="/api/save-config":
+        elif self.path=="/api/save-config":
             b=json.loads(self.rfile.read(int(self.headers.get("Content-Length",0))))
-            uid=self.headers.get("X-User-Id")
-            if uid and ("tg_dest_chat_id" in b or "tg_dest_topic_id" in b):
-                save_user_settings(uid,b.get("tg_dest_chat_id",""),b.get("tg_dest_topic_id",""))
-                b={k:v for k,v in b.items() if k not in ("tg_dest_chat_id","tg_dest_topic_id")}
-            if b: save_config(b)
-            self._json({"ok":True})
-        elif path_only=="/api/scheduler-add":
+            save_config(b); self._json({"ok":True})
+        elif self.path=="/api/scheduler-add":
             b=json.loads(self.rfile.read(int(self.headers.get("Content-Length",0))))
             jid=scheduler_add(b); self._json({"ok":True,"id":jid})
-        elif path_only=="/api/scheduler-remove":
+        elif self.path=="/api/scheduler-remove":
             b=json.loads(self.rfile.read(int(self.headers.get("Content-Length",0))))
             scheduler_remove(b.get("id","")); self._json({"ok":True})
-        elif path_only=="/api/scheduler-toggle":
+        elif self.path=="/api/scheduler-toggle":
             b=json.loads(self.rfile.read(int(self.headers.get("Content-Length",0))))
             scheduler_toggle(b.get("id","")); self._json({"ok":True})
-        elif path_only=="/api/tg-connect":
+        elif self.path=="/api/tg-connect":
             b=json.loads(self.rfile.read(int(self.headers.get("Content-Length",0))))
             token=b.get("token","").strip(); nv=b.get("variants",5); mx=b.get("max_variants",50); auth=b.get("authorized",[])
             if not token: self._json({"error":"no token"}); return
@@ -3845,14 +3745,14 @@ else{document.body.innerHTML='<h2 style="font-family:sans-serif;text-align:cente
             tg_bot_start()
             time.sleep(2)
             self._json({"ok":True,"active":tg_bot_state["active"],"username":tg_bot_state["username"],"error":tg_bot_state["error"]})
-        elif path_only=="/api/tg-disconnect":
+        elif self.path=="/api/tg-disconnect":
             tg_bot_stop(); save_config({"tg_bot_token":""})
             self._json({"ok":True})
-        elif path_only=="/api/dc-start":
+        elif self.path=="/api/dc-start":
             dc_bot_start()
             time.sleep(2)
             self._json({"ok":True,"active":dc_bot_state["active"],"username":dc_bot_state["username"],"error":dc_bot_state["error"]})
-        elif path_only=="/api/sim-upload":
+        elif self.path=="/api/sim-upload":
             cl=int(self.headers.get("Content-Length",0))
             slot=self.headers.get("X-Slot","1")  # "1" or "2"
             fname=urllib.parse.unquote(self.headers.get("X-Filename","file"))
@@ -3866,7 +3766,7 @@ else{document.body.innerHTML='<h2 style="font-family:sans-serif;text-align:cente
                 except: pass
             with open(fp,"wb") as f: f.write(data)
             self._json({"ok":True,"path":str(fp),"slot":slot})
-        elif path_only=="/api/sim-check":
+        elif self.path=="/api/sim-check":
             sim_dir=Path(tempfile.gettempdir())/"zychad_sim"
             f1=list(sim_dir.glob("file1_*")) if sim_dir.exists() else []
             f2=list(sim_dir.glob("file2_*")) if sim_dir.exists() else []
@@ -3874,7 +3774,7 @@ else{document.body.innerHTML='<h2 style="font-family:sans-serif;text-align:cente
             if sim_state["active"]: self._json({"error":"Analyse en cours..."}); return
             threading.Thread(target=run_similarity,args=(str(f1[0]),str(f2[0])),daemon=True).start()
             self._json({"ok":True})
-        elif path_only=="/api/sim-batch":
+        elif self.path=="/api/sim-batch":
             b=json.loads(self.rfile.read(int(self.headers.get("Content-Length",0))))
             orig=b.get("original","").strip(); vdir=b.get("variants_dir","").strip()
             if not orig or not vdir: self._json({"error":"Need original + variants_dir"}); return
@@ -3889,19 +3789,19 @@ else{document.body.innerHTML='<h2 style="font-family:sans-serif;text-align:cente
                     sim_state.update(active=False,result={"error":str(e)})
             threading.Thread(target=_batch,daemon=True).start()
             self._json({"ok":True})
-        elif path_only=="/api/watermark-embed":
+        elif self.path=="/api/watermark-embed":
             b=json.loads(self.rfile.read(int(self.headers.get("Content-Length",0))))
             img=b.get("image","").strip(); msg=b.get("message","").strip(); outp=b.get("output","")
             if not img or not msg: self._json({"error":"Need image + message"}); return
             r=lsb_embed(img,msg,outp if outp else None)
             self._json(r)
-        elif path_only=="/api/watermark-read":
+        elif self.path=="/api/watermark-read":
             b=json.loads(self.rfile.read(int(self.headers.get("Content-Length",0))))
             img=b.get("image","").strip()
             if not img: self._json({"error":"Need image path"}); return
             r=lsb_extract(img)
             self._json(r)
-        elif path_only=="/api/tt-scrape":
+        elif self.path=="/api/tt-scrape":
             b=json.loads(self.rfile.read(int(self.headers.get("Content-Length",0))))
             if tt_state["active"]: self._json({"error":"busy"}); return
             ak=b.get("api_key","").strip(); un=b.get("username","").strip(); mv=b.get("max_videos",50)
@@ -3909,16 +3809,13 @@ else{document.body.innerHTML='<h2 style="font-family:sans-serif;text-align:cente
             ob=b.get("output_base","").strip() or str(Path.home()/"Downloads"/"zychad_scrape")
             threading.Thread(target=run_tt_scrape,args=(ak,un,mv,ob),daemon=True).start()
             self._json({"ok":True})
-        elif path_only=="/api/start":
+        elif self.path=="/api/start":
             b=json.loads(self.rfile.read(int(self.headers.get("Content-Length",0))))
             if state["active"]: self._json({"error":"busy"}); return
             i=b.get("input_dir","").strip(); o=b.get("output_dir","").strip()
             if not i: self._json({"error":"no input"}); return
             if not Path(i).exists(): reset(); state["done"]=True; log(f"❌ Dossier introuvable: {i}","error"); self._json({"error":"not found"}); return
             if not o: o=str(Path(i).parent/"zychad_output")
-            # SaaS: chemins Windows invalides sur Linux → utiliser /tmp/zychad_output
-            elif ":" in o or "\\" in o or o.startswith("C:"):
-                o=str(Path(tempfile.gettempdir())/"zychad_output")
             dest=b.get("dest","local")
             gfid=b.get("gdrive_folder_id","")
             tgcid=b.get("tg_chat_id","")
@@ -4032,8 +3929,8 @@ def main():
     if cfg_check.get("tg_bot_token","").strip():
         print("  🤖 Démarrage du bot Telegram...")
         tg_bot_start()
-    # Check for --network flag or Docker (PORT env) to listen on all interfaces
-    network_mode="--network" in sys.argv or "-n" in sys.argv or bool(os.environ.get("PORT"))
+    # Check for --network flag to listen on all interfaces
+    network_mode="--network" in sys.argv or "-n" in sys.argv
     bind_addr="0.0.0.0" if network_mode else "127.0.0.1"
     api_key=get_api_key()
     print(f"""
@@ -4049,11 +3946,8 @@ def main():
 """)
     srv=HTTPServer((bind_addr,PORT),H)
     url=f"http://localhost:{PORT}"
-    if not network_mode:
-        threading.Timer(.5,lambda:webbrowser.open(url)).start()
-        print(f"  🌐 Ouverture de {url}...\n  ⏹  Ctrl+C pour arrêter\n")
-    else:
-        print(f"  🌐 Serveur sur {bind_addr}:{PORT}\n  ⏹  Ctrl+C pour arrêter\n")
+    threading.Timer(.5,lambda:webbrowser.open(url)).start()
+    print(f"  🌐 Ouverture de {url}...\n  ⏹  Ctrl+C pour arrêter\n")
     try: srv.serve_forever()
     except KeyboardInterrupt: print("\n  👋 Bye"); srv.shutdown()
 
