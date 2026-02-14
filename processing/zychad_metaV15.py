@@ -2755,6 +2755,18 @@ Ou envoyer un fichier → reçoit les variantes
 let poll,spoll;
 // SaaS: transmettre le token à toutes les requêtes API (Nginx auth_request)
 function apiUrl(u){const t=new URLSearchParams(location.search).get('token');return t?u+(u.includes('?')?'&':'?')+'token='+encodeURIComponent(t):u;}
+// Fetch + parse JSON avec gestion des erreurs (401, 403, body vide)
+async function apiJson(url,opts={}){
+  const r=await fetch(url,opts);
+  const text=await r.text();
+  if(!r.ok){
+    if(r.status===401){alert('Session expirée. Rafraîchis la page depuis le dashboard.');if(poll)clearInterval(poll);poll=null;location.href='https://www.zychadmeta.com/dashboard';return null;}
+    if(r.status===403){alert('Quota dépassé. Passe à un plan payant.');return null;}
+    throw new Error('Erreur '+r.status+(text?': '+text.slice(0,100):''));
+  }
+  if(!text||!text.trim())return null;
+  try{return JSON.parse(text);}catch(e){throw new Error('Réponse invalide: '+text.slice(0,80));}
+}
 
 /* Tabs */
 function stab(n){
@@ -2785,6 +2797,11 @@ document.addEventListener('DOMContentLoaded',()=>{
     const el=document.getElementById(id);
     if(el) el.addEventListener('blur',saveCfg);
   });
+  // SaaS: chemin sortie par défaut si vide (évite chemins Windows invalides)
+  if(new URLSearchParams(location.search).get('token')){
+    const odir=document.getElementById('odir');
+    if(odir&&(!odir.value||odir.value.includes(':\\')||odir.value.includes('C:')))odir.value='/tmp/zychad_output';
+  }
 });
 
 /* Presets — custom, saved in config */
@@ -2883,8 +2900,8 @@ function varNav(dir){
 
 /* Folder picker */
 async function pickFolder(targetId){
-  const r=await(await fetch(apiUrl('/api/pick-folder'))).json();
-  if(r.folder) document.getElementById(targetId).value=r.folder;
+  const r=await apiJson(apiUrl('/api/pick-folder?target='+targetId));
+  if(r&&r.folder) document.getElementById(targetId).value=r.folder;
   else alert('En mode web, utilise le glisser-d\u00e9poser des fichiers dans la zone ci-dessus.');
 }
 
@@ -2997,9 +3014,11 @@ document.getElementById('preview-zone').style.display='none';
 document.getElementById('pause-btn').innerHTML='⏸ Pause';
 document.getElementById('eta-display').textContent='';
 const d={input_dir:document.getElementById('idir').value,output_dir:document.getElementById('odir').value,variants:parseInt(document.getElementById('nv').value)||10,workers:parseInt(document.getElementById('nw').value)||4,rename:document.getElementById('rn').checked,double_process:document.getElementById('dbl').checked,stealth:document.getElementById('stealth').checked,naming_template:document.getElementById('ntpl')?document.getElementById('ntpl').value.trim():'',dest:destMode,gdrive_folder_id:document.getElementById('gd-folder-id')?document.getElementById('gd-folder-id').value.trim():'',tg_chat_id:document.getElementById('tg-chat-id')?document.getElementById('tg-chat-id').value.trim():'',tg_topic_id:document.getElementById('tg-topic-id')?document.getElementById('tg-topic-id').value.trim():''};
-await fetch(apiUrl('/api/start'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});poll=setInterval(pp,400)}
+const startR=await apiJson(apiUrl('/api/start'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});
+if(startR&&!startR.error){poll=setInterval(pp,400)}else{const b=document.getElementById('sb');if(b){b.disabled=false;b.innerHTML='Lancer le traitement';document.getElementById('pc').classList.remove('on');document.getElementById('proc-controls').classList.add('hide');}if(startR&&startR.error)alert(startR.error);}
 
-async function pp(){const d=await(await fetch(apiUrl('/api/progress'))).json();
+async function pp(){let d;try{d=await apiJson(apiUrl('/api/progress'));}catch(e){if(poll)clearInterval(poll);poll=null;const b=document.getElementById('sb');if(b){b.disabled=false;b.innerHTML='Lancer le traitement';}alert('Erreur: '+e.message);return;}
+if(!d)return;
 const p=d.total>0?(d.progress/d.total*100):0;document.getElementById('pf').style.width=p+'%';
 document.getElementById('ps').textContent=d.progress+' / '+d.total;document.getElementById('pt').textContent=d.file||'Traitement...';
 if(d.eta)document.getElementById('eta-display').textContent=d.eta+' restantes';
@@ -3012,7 +3031,7 @@ if(d.queue&&d.queue.length>0){
     return '<div style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:10px"><span>'+icons[q.status]+'</span><span style="color:'+colors[q.status]+';flex:1">'+q.name+'</span><span style="color:var(--mut)">'+q.type+'</span></div>';
   }).join('');
 }
-const l=document.getElementById('pl');l.innerHTML=d.log.map(e=>{const c=e.l==='ok'?'lo':e.l==='error'?'le':'li';return'<div><span class="lt">['+e.t+']</span><span class="'+c+'">'+e.m+'</span></div>'}).join('');l.scrollTop=l.scrollHeight;
+const l=document.getElementById('pl');l.innerHTML=(d.log||[]).map(e=>{const c=e.l==='ok'?'lo':e.l==='error'?'le':'li';return'<div><span class="lt">['+e.t+']</span><span class="'+c+'">'+e.m+'</span></div>'}).join('');l.scrollTop=l.scrollHeight;
 if(d.done){clearInterval(poll);const b=document.getElementById('sb');b.disabled=false;b.innerHTML='Lancer le traitement';
 document.getElementById('proc-controls').classList.add('hide');
 document.getElementById('rc').classList.add('on');document.getElementById('rn2').textContent=d.results.length;
@@ -3042,8 +3061,8 @@ async function genPreview(){
   document.getElementById('preview-btn').disabled=true;
   document.getElementById('preview-btn').innerHTML='⏳...';
   try{
-    const r=await(await fetch(apiUrl('/api/preview'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({input_dir:idir})})).json();
-    if(r.error){alert(r.error);return}
+    const r=await apiJson(apiUrl('/api/preview'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({input_dir:idir})});
+    if(!r||r.error){alert(r&&r.error?r.error:'Erreur preview');return}
     const pz=document.getElementById('preview-zone');pz.style.display='block';
     const orig=document.getElementById('pv-orig');const vari=document.getElementById('pv-var');
     if(r.type==='image'){
@@ -3696,15 +3715,25 @@ else{document.body.innerHTML='<h2 style="font-family:sans-serif;text-align:cente
                 self.send_response(200); self.send_header("Content-Type",ct); self.send_header("Content-Length",str(fp.stat().st_size)); self.end_headers()
                 with open(fp,"rb") as f: self.wfile.write(f.read())
             else: self.send_response(404); self.end_headers()
-        elif self.path=="/api/pick-folder":
+        elif self.path.startswith("/api/pick-folder"):
             folder=""
-            try:
-                import tkinter as tk
-                from tkinter import filedialog
-                root=tk.Tk(); root.withdraw(); root.attributes("-topmost",True)
-                folder=filedialog.askdirectory(title="Sélectionne un dossier")
-                root.destroy()
-            except: pass
+            uid=self.headers.get("X-User-Id")
+            # SaaS: pas de GUI en Docker → retourner chemins par défaut
+            if uid:
+                qs=urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+                target=qs.get("target",[""])[0]
+                tmp=str(Path(tempfile.gettempdir()))
+                if target=="idir": folder=tmp+"/zychad_drop"
+                elif target=="odir": folder=tmp+"/zychad_output"
+                else: folder=tmp+"/zychad_output"
+            else:
+                try:
+                    import tkinter as tk
+                    from tkinter import filedialog
+                    root=tk.Tk(); root.withdraw(); root.attributes("-topmost",True)
+                    folder=filedialog.askdirectory(title="Sélectionne un dossier")
+                    root.destroy()
+                except: pass
             self._json({"folder":folder})
         elif self.path.startswith("/api/upload-done"):
             # Return the temp upload folder path
@@ -3889,6 +3918,9 @@ else{document.body.innerHTML='<h2 style="font-family:sans-serif;text-align:cente
             if not i: self._json({"error":"no input"}); return
             if not Path(i).exists(): reset(); state["done"]=True; log(f"❌ Dossier introuvable: {i}","error"); self._json({"error":"not found"}); return
             if not o: o=str(Path(i).parent/"zychad_output")
+            # SaaS: chemins Windows invalides sur Linux → utiliser /tmp/zychad_output
+            elif ":" in o or "\\" in o or o.startswith("C:"):
+                o=str(Path(tempfile.gettempdir())/"zychad_output")
             dest=b.get("dest","local")
             gfid=b.get("gdrive_folder_id","")
             tgcid=b.get("tg_chat_id","")
