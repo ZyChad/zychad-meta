@@ -2753,6 +2753,8 @@ Ou envoyer un fichier → reçoit les variantes
 
 <script>
 let poll,spoll;
+// SaaS: transmettre le token à toutes les requêtes API (Nginx auth_request)
+function apiUrl(u){const t=new URLSearchParams(location.search).get('token');return t?u+(u.includes('?')?'&':'?')+'token='+encodeURIComponent(t):u;}
 
 /* Tabs */
 function stab(n){
@@ -2763,7 +2765,7 @@ function stab(n){
 /* Config auto-load/save */
 async function loadCfg(){
   try{
-    const c=await(await fetch('/api/config')).json();
+    const c=await(await fetch(apiUrl('/api/config'))).json();
     if(c.ig_key) document.getElementById('skey').value=c.ig_key;
     if(c.tt_key) document.getElementById('ttkey').value=c.tt_key;
     if(c.variants) document.getElementById('nv').value=c.variants;
@@ -2775,7 +2777,7 @@ async function loadCfg(){
 }
 function saveCfg(){
   const d={ig_key:document.getElementById('skey').value,tt_key:document.getElementById('ttkey').value,variants:document.getElementById('nv').value,workers:document.getElementById('nw').value,gdrive_folder_id:document.getElementById('gd-folder-id').value,tg_dest_chat_id:document.getElementById('tg-chat-id').value,tg_dest_topic_id:document.getElementById('tg-topic-id').value};
-  fetch('/api/save-config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});
+  fetch(apiUrl('/api/save-config'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});
 }
 // Auto-save when API key fields lose focus
 document.addEventListener('DOMContentLoaded',()=>{
@@ -2788,7 +2790,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 /* Presets — custom, saved in config */
 async function loadPresets(){
   try{
-    const c=await(await fetch('/api/config')).json();
+    const c=await(await fetch(apiUrl('/api/config'))).json();
     const bar=document.getElementById('presetBar');
     // Clear existing preset buttons (keep the + button)
     bar.querySelectorAll('.preset-btn').forEach(b=>b.remove());
@@ -2813,16 +2815,16 @@ function savePreset(){
   const name=prompt('Nom du préset :');
   if(!name) return;
   const p={v:parseInt(document.getElementById('nv').value)||10,w:parseInt(document.getElementById('nw').value)||4,r:document.getElementById('rn').checked};
-  fetch('/api/config').then(r=>r.json()).then(c=>{
+    fetch(apiUrl('/api/config')).then(r=>r.json()).then(c=>{
     if(!c.presets) c.presets={};
     c.presets[name]=p;
-    fetch('/api/save-config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({presets:c.presets})}).then(()=>loadPresets());
+    fetch(apiUrl('/api/save-config'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({presets:c.presets})}).then(()=>loadPresets());
   });
 }
 function deletePreset(name){
-  fetch('/api/config').then(r=>r.json()).then(c=>{
+    fetch(apiUrl('/api/config')).then(r=>r.json()).then(c=>{
     if(c.presets) delete c.presets[name];
-    fetch('/api/save-config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({presets:c.presets||{}})}).then(()=>loadPresets());
+    fetch(apiUrl('/api/save-config'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({presets:c.presets||{}})}).then(()=>loadPresets());
   });
 }
 
@@ -2844,11 +2846,11 @@ function renderPreview(){
   const isVid=fname.endsWith('.mp4');
   const origName=g.orig;
   if(isVid){
-    origC.innerHTML='<video src="/api/original/'+origName+'" style="width:100%;border-radius:6px" controls muted></video>';
-    modC.innerHTML='<video src="/api/preview/'+fname+'" style="width:100%;border-radius:6px" controls muted></video>';
+    origC.innerHTML='<video src="'+apiUrl('/api/original/'+origName)+'" style="width:100%;border-radius:6px" controls muted></video>';
+    modC.innerHTML='<video src="'+apiUrl('/api/preview/'+fname)+'" style="width:100%;border-radius:6px" controls muted></video>';
   }else{
-    origC.innerHTML='<img src="/api/original/'+origName+'" style="width:100%;border-radius:6px">';
-    modC.innerHTML='<img src="/api/preview/'+fname+'" style="width:100%;border-radius:6px">';
+    origC.innerHTML='<img src="'+apiUrl('/api/original/'+origName)+'" style="width:100%;border-radius:6px">';
+    modC.innerHTML='<img src="'+apiUrl('/api/preview/'+fname)+'" style="width:100%;border-radius:6px">';
   }
   document.getElementById('prev-idx').textContent=(fileIdx+1)+'/'+prevGroups.length;
   document.getElementById('var-idx').textContent=(varIdx+1)+'/'+g.variants.length;
@@ -2872,16 +2874,16 @@ function varNav(dir){
   const modC=document.getElementById('prev-mod');
   const isVid=fname.endsWith('.mp4');
   if(isVid){
-    modC.innerHTML='<video src="/api/preview/'+fname+'" style="width:100%;border-radius:6px" controls muted></video>';
+    modC.innerHTML='<video src="'+apiUrl('/api/preview/'+fname)+'" style="width:100%;border-radius:6px" controls muted></video>';
   }else{
-    modC.innerHTML='<img src="/api/preview/'+fname+'" style="width:100%;border-radius:6px">';
+    modC.innerHTML='<img src="'+apiUrl('/api/preview/'+fname)+'" style="width:100%;border-radius:6px">';
   }
   document.getElementById('var-idx').textContent=(varIdx+1)+'/'+prevGroups[fileIdx].variants.length;
 }
 
 /* Folder picker */
 async function pickFolder(targetId){
-  const r=await(await fetch('/api/pick-folder')).json();
+  const r=await(await fetch(apiUrl('/api/pick-folder'))).json();
   if(r.folder) document.getElementById(targetId).value=r.folder;
   else alert('En mode web, utilise le glisser-d\u00e9poser des fichiers dans la zone ci-dessus.');
 }
@@ -2899,14 +2901,14 @@ async function handleDrop(e){
   document.getElementById('dz-text').style.display='none';
   const ok=document.getElementById('dz-ok');ok.style.display='block';ok.textContent='Envoi de '+files.length+' fichiers...';
   // Clear temp folder first
-  await fetch('/api/upload-clear',{method:'POST'});
+  await fetch(apiUrl('/api/upload-clear'),{method:'POST'});
   let sent=0;
   for(const f of droppedFiles){
-    await fetch('/api/upload-file',{method:'POST',headers:{'X-Filename':encodeURIComponent(f.name),'Content-Length':f.size},body:f});
+    await fetch(apiUrl('/api/upload-file'),{method:'POST',headers:{'X-Filename':encodeURIComponent(f.name),'Content-Length':f.size},body:f});
     sent++;ok.textContent=sent+'/'+droppedFiles.length+' fichiers envoyés...';
     updateDroppedFileStatus(f.name,'ok');
   }
-  const r=await(await fetch('/api/upload-done')).json();
+  const r=await(await fetch(apiUrl('/api/upload-done'))).json();
   document.getElementById('idir').value=r.folder;
   ok.textContent='✅ '+droppedFiles.length+' fichiers prêts';
   dz.style.borderColor='var(--grn)';
@@ -2987,7 +2989,7 @@ function notifyDesktop(title,body){
 initNotifications();
 
 /* Uniquifier */
-async function ck(){const r=await(await fetch('/api/status')).json();if(!r.ffmpeg){document.getElementById('fw').style.display='block';document.getElementById('fs').innerHTML=r.fi.steps.map(s=>'<p>'+s+'</p>').join('')}}
+async function ck(){const r=await(await fetch(apiUrl('/api/status'))).json();if(!r.ffmpeg){document.getElementById('fw').style.display='block';document.getElementById('fs').innerHTML=r.fi.steps.map(s=>'<p>'+s+'</p>').join('')}}
 async function go(){const b=document.getElementById('sb');b.disabled=true;b.innerHTML='<span class="sp"></span>Traitement en cours...';
 document.getElementById('pc').classList.add('on');document.getElementById('rc').classList.remove('on');document.getElementById('pl').innerHTML='';
 document.getElementById('proc-controls').classList.remove('hide');
@@ -2995,9 +2997,9 @@ document.getElementById('preview-zone').style.display='none';
 document.getElementById('pause-btn').innerHTML='⏸ Pause';
 document.getElementById('eta-display').textContent='';
 const d={input_dir:document.getElementById('idir').value,output_dir:document.getElementById('odir').value,variants:parseInt(document.getElementById('nv').value)||10,workers:parseInt(document.getElementById('nw').value)||4,rename:document.getElementById('rn').checked,double_process:document.getElementById('dbl').checked,stealth:document.getElementById('stealth').checked,naming_template:document.getElementById('ntpl')?document.getElementById('ntpl').value.trim():'',dest:destMode,gdrive_folder_id:document.getElementById('gd-folder-id')?document.getElementById('gd-folder-id').value.trim():'',tg_chat_id:document.getElementById('tg-chat-id')?document.getElementById('tg-chat-id').value.trim():'',tg_topic_id:document.getElementById('tg-topic-id')?document.getElementById('tg-topic-id').value.trim():''};
-await fetch('/api/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});poll=setInterval(pp,400)}
+await fetch(apiUrl('/api/start'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});poll=setInterval(pp,400)}
 
-async function pp(){const d=await(await fetch('/api/progress')).json();
+async function pp(){const d=await(await fetch(apiUrl('/api/progress'))).json();
 const p=d.total>0?(d.progress/d.total*100):0;document.getElementById('pf').style.width=p+'%';
 document.getElementById('ps').textContent=d.progress+' / '+d.total;document.getElementById('pt').textContent=d.file||'Traitement...';
 if(d.eta)document.getElementById('eta-display').textContent=d.eta+' restantes';
@@ -3024,13 +3026,13 @@ saveCfg();}}
 
 /* Pause / Cancel */
 async function togglePause(){
-  const r=await(await fetch('/api/pause')).json();
+  const r=await(await fetch(apiUrl('/api/pause'))).json();
   document.getElementById('pause-btn').innerHTML=r.paused?'▶ Reprendre':'⏸ Pause';
   document.getElementById('pt').textContent=r.paused?'⏸ En pause...':document.getElementById('pt').textContent;
 }
 async function cancelJob(){
   if(!confirm('Annuler le traitement en cours ?'))return;
-  await fetch('/api/cancel');
+  await fetch(apiUrl('/api/cancel'));
 }
 
 /* Preview */
@@ -3040,22 +3042,22 @@ async function genPreview(){
   document.getElementById('preview-btn').disabled=true;
   document.getElementById('preview-btn').innerHTML='⏳...';
   try{
-    const r=await(await fetch('/api/preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({input_dir:idir})})).json();
+    const r=await(await fetch(apiUrl('/api/preview'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({input_dir:idir})})).json();
     if(r.error){alert(r.error);return}
     const pz=document.getElementById('preview-zone');pz.style.display='block';
     const orig=document.getElementById('pv-orig');const vari=document.getElementById('pv-var');
     if(r.type==='image'){
-      orig.innerHTML='<img src="/api/file?p='+encodeURIComponent(r.original)+'" style="max-width:100%;max-height:200px">';
-      vari.innerHTML='<img src="/api/file?p='+encodeURIComponent(r.variant)+'" style="max-width:100%;max-height:200px">';
+      orig.innerHTML='<img src="'+apiUrl('/api/file?p='+encodeURIComponent(r.original))+'" style="max-width:100%;max-height:200px">';
+      vari.innerHTML='<img src="'+apiUrl('/api/file?p='+encodeURIComponent(r.variant))+'" style="max-width:100%;max-height:200px">';
     }else{
-      orig.innerHTML='<video src="/api/file?p='+encodeURIComponent(r.original)+'" controls style="max-width:100%;max-height:200px"></video>';
-      vari.innerHTML='<video src="/api/file?p='+encodeURIComponent(r.variant)+'" controls style="max-width:100%;max-height:200px"></video>';
+      orig.innerHTML='<video src="'+apiUrl('/api/file?p='+encodeURIComponent(r.original))+'" controls style="max-width:100%;max-height:200px"></video>';
+      vari.innerHTML='<video src="'+apiUrl('/api/file?p='+encodeURIComponent(r.variant))+'" controls style="max-width:100%;max-height:200px"></video>';
     }
   }catch(e){alert('Erreur preview: '+e)}
   finally{document.getElementById('preview-btn').disabled=false;document.getElementById('preview-btn').innerHTML='👁 Preview'}
 }
-function op(){window.location.href='/api/download-zip'}
-function oz(){window.location.href='/api/download-zip'}
+function op(){window.location.href=apiUrl('/api/download-zip')}
+function oz(){window.location.href=apiUrl('/api/download-zip')}
 
 /* Destination toggle */
 let destMode='local';
@@ -3088,7 +3090,7 @@ function gdConnect(){
         if(d.email) document.getElementById('gd-user-email').textContent='✅ '+d.email;
       }).catch(()=>{});
       // Save token to backend
-      fetch('/api/gdrive-token',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:gdOAuthToken})});
+      fetch(apiUrl('/api/gdrive-token'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:gdOAuthToken})});
       window.removeEventListener('message',handler);
     }
   });
@@ -3098,7 +3100,7 @@ function gdPollUpload(){
   document.getElementById('gd-status').textContent='Upload vers Drive...';
   document.getElementById('gd-fill').style.width='0%';
   const gi=setInterval(async()=>{
-    const d=await(await fetch('/api/gdrive-progress')).json();
+    const d=await(await fetch(apiUrl('/api/gdrive-progress'))).json();
     const p=d.total>0?(d.progress/d.total*100):0;
     document.getElementById('gd-fill').style.width=p+'%';
     document.getElementById('gd-status').textContent=d.error?'❌ '+d.error:d.done?'✅ '+d.files_uploaded+' fichiers uploadés sur Drive !':d.progress+'/'+d.total+' fichiers...';
@@ -3110,7 +3112,7 @@ function tgPollUpload(){
   document.getElementById('tg-status').textContent='Envoi sur Telegram...';
   document.getElementById('tg-fill').style.width='0%';
   const gi=setInterval(async()=>{
-    const d=await(await fetch('/api/tg-send-progress')).json();
+    const d=await(await fetch(apiUrl('/api/tg-send-progress'))).json();
     const p=d.total>0?(d.progress/d.total*100):0;
     document.getElementById('tg-fill').style.width=p+'%';
     document.getElementById('tg-status').textContent=d.error?'❌ '+d.error:d.done?'✅ '+d.files_sent+' fichiers envoyés sur Telegram !':d.progress+'/'+d.total+' fichiers...';
@@ -3128,11 +3130,11 @@ async function goScrape(){
   document.getElementById('slog').classList.add('on');document.getElementById('slog').innerHTML='';
   document.getElementById('sdone').classList.remove('on');
   const d={api_key:key,username:user,max_posts:parseInt(document.getElementById('smax').value)||50,skip_reels:document.getElementById('sskip').checked,output_base:document.getElementById('sout').value.trim(),days_filter:parseInt(document.getElementById('speriod').value)||0,min_likes:parseInt(document.getElementById('sminlikes').value)||0};
-  await fetch('/api/scrape',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});
+  await fetch(apiUrl('/api/scrape'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});
   spoll=setInterval(spp,500);
 }
 async function spp(){
-  const d=await(await fetch('/api/scrape-progress')).json();
+  const d=await(await fetch(apiUrl('/api/scrape-progress'))).json();
   const p=d.total>0?(d.downloaded/d.total*100):0;
   document.getElementById('sfill').style.width=p+'%';
   document.getElementById('snum').textContent=d.downloaded+'/'+d.total;
@@ -3167,11 +3169,11 @@ async function goTT(){
   document.getElementById('ttlog').classList.add('on');document.getElementById('ttlog').innerHTML='';
   document.getElementById('ttdone').classList.remove('on');
   const d={api_key:key,username:user,max_videos:parseInt(document.getElementById('ttmax').value)||50,output_base:document.getElementById('ttout').value.trim()};
-  await fetch('/api/tt-scrape',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});
+  await fetch(apiUrl('/api/tt-scrape'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});
   ttpoll=setInterval(ttpp,500);
 }
 async function ttpp(){
-  const d=await(await fetch('/api/tt-progress')).json();
+  const d=await(await fetch(apiUrl('/api/tt-progress'))).json();
   const p=d.total>0?(d.downloaded/d.total*100):0;
   document.getElementById('ttfill').style.width=p+'%';
   document.getElementById('ttnum').textContent=d.downloaded+'/'+d.total;
@@ -3203,16 +3205,16 @@ async function addSchJob(){
   const val=parseInt(document.getElementById('sch-val').value)||24;
   const unit=document.getElementById('sch-unit').value;
   const hours=unit==='d'?val*24:val;
-  const cfg=await(await fetch('/api/config')).json();
+  const cfg=await(await fetch(apiUrl('/api/config'))).json();
   const key=plat==='ig'?cfg.ig_key:cfg.tt_key;
   if(!key){alert('Sauvegarde d\'abord ta clé API '+plat.toUpperCase()+' dans l\'onglet scraper');return}
   const job={platform:plat,username:user.replace('@',''),api_key:key,interval_h:hours,max_posts:parseInt(document.getElementById('sch-max').value)||50,skip_reels:document.getElementById('sch-skip').checked};
-  await fetch('/api/scheduler-add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(job)});
+  await fetch(apiUrl('/api/scheduler-add'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(job)});
   document.getElementById('sch-user').value='';
   loadScheduler();
 }
 async function loadScheduler(){
-  const d=await(await fetch('/api/scheduler')).json();
+  const d=await(await fetch(apiUrl('/api/scheduler'))).json();
   const el=document.getElementById('sch-list');
   if(!d.jobs||!d.jobs.length){el.innerHTML='Aucun job programmé';return}
   el.innerHTML=d.jobs.map(j=>{
@@ -3225,20 +3227,20 @@ async function loadScheduler(){
   }).join('');
 }
 async function toggleSch(id){
-  await fetch('/api/scheduler-toggle',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});
+  await fetch(apiUrl('/api/scheduler-toggle'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});
   loadScheduler();loadDash();
 }
 async function removeSch(id){
   if(!confirm('Supprimer ce job ?')) return;
-  await fetch('/api/scheduler-remove',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});
+  await fetch(apiUrl('/api/scheduler-remove'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});
   loadScheduler();loadDash();
 }
 
 /* Dashboard */
 async function loadDash(){
   try{
-    const s=await(await fetch('/api/stats')).json();
-    const sc=await(await fetch('/api/scheduler')).json();
+    const s=await(await fetch(apiUrl('/api/stats'))).json();
+    const sc=await(await fetch(apiUrl('/api/scheduler'))).json();
     document.getElementById('st-variants').textContent=s.total_variants||0;
     document.getElementById('st-scrapes').textContent=s.total_scrapes||0;
     document.getElementById('st-jobs').textContent=(sc.jobs||[]).filter(j=>j.active).length;
@@ -3267,7 +3269,7 @@ async function simUpload(f,slot){
   const el=document.getElementById('sim-name'+slot);
   const short=f.name.length>35?f.name.substring(0,32)+'...':f.name;
   el.style.display='block';el.textContent='⏳ '+short;
-  await fetch('/api/sim-upload',{method:'POST',headers:{'X-Filename':encodeURIComponent(f.name),'X-Slot':slot,'Content-Length':f.size},body:f});
+  await fetch(apiUrl('/api/sim-upload'),{method:'POST',headers:{'X-Filename':encodeURIComponent(f.name),'X-Slot':slot,'Content-Length':f.size},body:f});
   simFiles[slot]=f.name;
   el.textContent='✅ '+short;
   document.getElementById('sim-drop'+slot).style.borderColor='var(--grn)';
@@ -3276,11 +3278,11 @@ async function simCheck(){
   if(!simFiles[1]||!simFiles[2]){alert('Uploade 2 fichiers');return}
   const btn=document.getElementById('sim-btn');btn.disabled=true;btn.innerHTML='<span class="sp"></span>Analyse...';
   document.getElementById('sim-result').style.display='none';
-  const r=await(await fetch('/api/sim-check',{method:'POST'})).json();
+  const r=await(await fetch(apiUrl('/api/sim-check'),{method:'POST'})).json();
   if(r.error){alert(r.error);btn.disabled=false;btn.textContent='Analyser la similarité';return}
   // Poll for result
   const poll=setInterval(async()=>{
-    const s=await(await fetch('/api/sim-status')).json();
+    const s=await(await fetch(apiUrl('/api/sim-status'))).json();
     if(!s.active&&s.result){
       clearInterval(poll);
       btn.disabled=false;btn.textContent='Analyser la similarité';
@@ -3306,10 +3308,10 @@ async function batchSim(){
   const orig=document.getElementById('bsim-orig').value.trim();
   const vdir=document.getElementById('bsim-dir').value.trim();
   if(!orig||!vdir){alert('Remplis les 2 champs');return}
-  const r=await(await fetch('/api/sim-batch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({original:orig,variants_dir:vdir})})).json();
+  const r=await(await fetch(apiUrl('/api/sim-batch'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({original:orig,variants_dir:vdir})})).json();
   if(r.error){alert(r.error);return}
   const poll=setInterval(async()=>{
-    const s=await(await fetch('/api/sim-status')).json();
+    const s=await(await fetch(apiUrl('/api/sim-status'))).json();
     if(!s.active&&s.result){
       clearInterval(poll);
       const d=s.result;
@@ -3332,9 +3334,9 @@ async function batchSim(){
 /* Telegram Bot */
 async function loadTgStatus(){
   try{
-    const r=await(await fetch('/api/tg-status')).json();
+    const r=await(await fetch(apiUrl('/api/tg-status'))).json();
     const bar=document.getElementById('tg-status-bar');
-    const cfg=await(await fetch('/api/config')).json();
+    const cfg=await(await fetch(apiUrl('/api/config'))).json();
     if(cfg.tg_bot_token) document.getElementById('tg-token').value=cfg.tg_bot_token;
     if(cfg.tg_variants) document.getElementById('tg-nv').value=cfg.tg_variants;
     if(cfg.tg_max_variants) document.getElementById('tg-mx').value=cfg.tg_max_variants;
@@ -3362,20 +3364,20 @@ async function tgConnect(){
   const authStr=document.getElementById('tg-auth').value.trim();
   const auth=authStr?authStr.split(',').map(s=>parseInt(s.trim())).filter(n=>!isNaN(n)):[];
   const btn=document.getElementById('tg-conn-btn');btn.disabled=true;btn.innerHTML='<span class="sp"></span>Connexion...';
-  const r=await(await fetch('/api/tg-connect',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token,variants:nv,max_variants:mx,authorized:auth})})).json();
+  const r=await(await fetch(apiUrl('/api/tg-connect'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token,variants:nv,max_variants:mx,authorized:auth})})).json();
   btn.disabled=false;btn.innerHTML='Reconnecter';
   loadTgStatus();
 }
 async function tgDisconnect(){
   if(!confirm('Déconnecter le bot Telegram ?')) return;
-  await fetch('/api/tg-disconnect',{method:'POST'});
+  await fetch(apiUrl('/api/tg-disconnect'),{method:'POST'});
   document.getElementById('tg-disc-btn').disabled=true;
   loadTgStatus();
 }
 
 /* API key */
 async function loadApiKey(){
-  try{const r=await(await fetch('/api/api-key')).json();document.getElementById('api-key-display').value=r.key||''}catch(e){}
+  try{const r=await(await fetch(apiUrl('/api/api-key'))).json();document.getElementById('api-key-display').value=r.key||''}catch(e){}
 }
 function copyApiKey(){
   const el=document.getElementById('api-key-display');el.select();document.execCommand('copy');
@@ -3383,12 +3385,12 @@ function copyApiKey(){
 }
 async function regenApiKey(){
   if(!confirm('Régénérer la clé API ? L\'ancienne ne fonctionnera plus.')) return;
-  const r=await(await fetch('/api/api-key-regen')).json();
+  const r=await(await fetch(apiUrl('/api/api-key-regen'))).json();
   document.getElementById('api-key-display').value=r.key||'';
 }
 
 ck();loadCfg();loadPresets();loadScheduler();loadDash();loadApiKey();loadTgStatus();
-fetch('/api/tg-bot-status').then(r=>r.json()).then(d=>{if(d.username&&document.getElementById('tg-bot-name'))document.getElementById('tg-bot-name').textContent='@'+d.username;}).catch(()=>{});
+fetch(apiUrl('/api/tg-bot-status')).then(r=>r.json()).then(d=>{if(d.username&&document.getElementById('tg-bot-name'))document.getElementById('tg-bot-name').textContent='@'+d.username;}).catch(()=>{});
 document.getElementById('stealth').addEventListener('change',function(){if(this.checked){document.getElementById('dbl').checked=true}});
 // ═══ Keyboard shortcuts ═══
 document.addEventListener('keydown',function(e){
@@ -3410,7 +3412,7 @@ async function wmEmbed(){
   const img=document.getElementById('wm-img').value.trim();
   const msg=document.getElementById('wm-msg').value.trim();
   if(!img||!msg){alert('Remplis image + message');return}
-  const r=await(await fetch('/api/watermark-embed',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image:img,message:msg})})).json();
+  const r=await(await fetch(apiUrl('/api/watermark-embed'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image:img,message:msg})})).json();
   const d=document.getElementById('wm-result');d.style.display='block';
   if(r.ok) d.innerHTML='<span style="color:var(--grn)">✅ Watermark encodé !</span> '+r.bits+' bits dans '+r.file;
   else d.innerHTML='<span style="color:var(--red)">❌ '+r.e+'</span>';
@@ -3418,7 +3420,7 @@ async function wmEmbed(){
 async function wmRead(){
   const img=document.getElementById('wm-img').value.trim();
   if(!img){alert('Remplis le chemin image');return}
-  const r=await(await fetch('/api/watermark-read',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image:img})})).json();
+  const r=await(await fetch(apiUrl('/api/watermark-read'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image:img})})).json();
   const d=document.getElementById('wm-result');d.style.display='block';
   if(r.ok) d.innerHTML='<span style="color:var(--teal2)">🔍 Message trouvé :</span> <code>'+r.message+'</code>';
   else d.innerHTML='<span style="color:var(--red)">❌ '+r.e+'</span>';
@@ -3438,11 +3440,11 @@ async function dcConnect(){
   const auth=document.getElementById('dc-auth').value.trim();
   if(!token){alert('Colle le token Discord');return}
   const channels=auth?auth.split(',').map(s=>s.trim()).filter(Boolean):[];
-  await fetch('/api/save-config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dc_bot_token:token,dc_authorized_channels:channels})});
-  await fetch('/api/dc-start',{method:'POST'});
+  await fetch(apiUrl('/api/save-config'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dc_bot_token:token,dc_authorized_channels:channels})});
+  await fetch(apiUrl('/api/dc-start'),{method:'POST'});
   const sb=document.getElementById('dc-status-bar');sb.style.display='block';sb.style.background='rgba(14,165,199,.1)';sb.style.color='var(--teal2)';sb.textContent='🎮 Connexion en cours...';
   setTimeout(async()=>{
-    const r=await(await fetch('/api/dc-status')).json();
+    const r=await(await fetch(apiUrl('/api/dc-status'))).json();
     if(r.active){sb.style.background='rgba(52,211,153,.1)';sb.style.color='var(--grn)';sb.textContent='✅ Bot Discord @'+r.username+' connecté';}
     else{sb.style.background='rgba(248,113,113,.1)';sb.style.color='var(--red)';sb.textContent='❌ '+(r.error||'Erreur de connexion');}
   },3000);
