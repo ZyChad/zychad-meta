@@ -2862,6 +2862,7 @@ function varNav(dir){
 async function pickFolder(targetId){
   const r=await(await fetch('/api/pick-folder')).json();
   if(r.folder) document.getElementById(targetId).value=r.folder;
+  else alert('En mode web, utilise le glisser-d\u00e9poser des fichiers dans la zone ci-dessus.');
 }
 
 /* Drag & Drop files — batch with preview */
@@ -3032,8 +3033,8 @@ async function genPreview(){
   }catch(e){alert('Erreur preview: '+e)}
   finally{document.getElementById('preview-btn').disabled=false;document.getElementById('preview-btn').innerHTML='👁 Preview'}
 }
-async function op(){await fetch('/api/open-output')}
-async function oz(){await fetch('/api/open-zip')}
+function op(){window.location.href='/api/download-zip'}
+function oz(){window.location.href='/api/download-zip'}
 
 /* Destination toggle */
 let destMode='local';
@@ -3542,7 +3543,8 @@ class H(BaseHTTPRequestHandler):
         self.end_headers()
     def do_GET(self):
         self._set_saas_user()
-        if self.path in["/","/index.html"]: self._html(HTML)
+        path_only=self.path.split("?")[0]
+        if path_only in["/","/index.html"]: self._html(HTML)
         elif self.path=="/manifest.json":
             m=json.dumps({"name":"ZyChad Meta","short_name":"ZyChad","start_url":"/","display":"standalone","background_color":"#0a0f1c","theme_color":"#0ea5c7","icons":[{"src":"/icon-192.png","sizes":"192x192","type":"image/png"}]})
             self.send_response(200)
@@ -3678,19 +3680,38 @@ else{document.body.innerHTML='<h2 style="font-family:sans-serif;text-align:cente
         elif self.path.startswith("/api/upload-done"):
             # Return the temp upload folder path
             self._json({"folder":str(Path(tempfile.gettempdir())/"zychad_drop")})
+        elif self.path=="/api/download-zip":
+            z=state.get("zip")
+            if z and Path(z).exists():
+                zp=Path(z)
+                self.send_response(200)
+                self.send_header("Content-Type","application/zip")
+                self.send_header("Content-Disposition",f'attachment; filename="{zp.name}"')
+                self.send_header("Content-Length",str(zp.stat().st_size))
+                self.end_headers()
+                with open(zp,"rb") as f: self.wfile.write(f.read())
+            else:
+                self.send_response(404)
+                self.send_header("Content-Type","text/html; charset=utf-8")
+                self.end_headers()
+                self.wfile.write(b"<html><body style='font-family:sans-serif;padding:2rem;text-align:center'><h2>Aucun ZIP disponible</h2><p>Lance un traitement et attends la fin pour t&eacute;l&eacute;charger le ZIP.</p><a href='/'>Retour</a></body></html>")
         elif self.path=="/api/open-output":
             o=state.get("output","")
             if o and Path(o).exists():
-                if platform.system()=="Windows": os.startfile(o)
-                elif platform.system()=="Darwin": subprocess.run(["open",o])
-                else: subprocess.run(["xdg-open",o])
+                try:
+                    if platform.system()=="Windows": os.startfile(o)
+                    elif platform.system()=="Darwin": subprocess.run(["open",o])
+                    else: subprocess.run(["xdg-open",o])
+                except (FileNotFoundError, OSError): pass  # Headless/Docker: pas de gestionnaire de fichiers
             self._json({"ok":True})
         elif self.path=="/api/open-zip":
             z=state.get("zip")
             if z and Path(z).exists():
-                if platform.system()=="Windows": os.startfile(str(Path(z).parent))
-                elif platform.system()=="Darwin": subprocess.run(["open","-R",z])
-                else: subprocess.run(["xdg-open",str(Path(z).parent)])
+                try:
+                    if platform.system()=="Windows": os.startfile(str(Path(z).parent))
+                    elif platform.system()=="Darwin": subprocess.run(["open","-R",z])
+                    else: subprocess.run(["xdg-open",str(Path(z).parent)])
+                except (FileNotFoundError, OSError): pass  # Headless/Docker: pas de gestionnaire de fichiers
             self._json({"ok":True})
         else: self.send_response(404); self.end_headers()
     def do_POST(self):
