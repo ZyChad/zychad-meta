@@ -8,7 +8,13 @@ export async function GET(req: NextRequest) {
   let userId: string | null = null;
   const originalHost = req.headers.get("x-original-host") ?? "";
 
-  const urlToken = req.nextUrl.searchParams.get("token");
+  // Token : query param (Nginx le passe explicitement) ou extrait de X-Original-URI
+  let urlToken = req.nextUrl.searchParams.get("token");
+  if (!urlToken) {
+    const originalUri = req.headers.get("x-original-uri") ?? "";
+    const match = originalUri.match(/[?&]token=([^&]+)/);
+    if (match) urlToken = decodeURIComponent(match[1]);
+  }
   if (urlToken) {
     try {
       const secret = new TextEncoder().encode(process.env.NEXTAUTH_SECRET);

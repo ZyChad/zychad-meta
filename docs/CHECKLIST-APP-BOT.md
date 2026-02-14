@@ -18,28 +18,34 @@ Chez ton registrar DNS (Cloudflare, OVH, etc.) :
 - Si **app.zychadmeta.com** est listé → **supprime-le**
 - Seuls **www.zychadmeta.com** et **zychadmeta.com** doivent rester
 
-### 3. Déployer le bot sur Hetzner
+Si app est sur Vercel, tu auras une 404 car Vercel ne sert pas le bot.
+
+### 3. Config Nginx : passer le token à verify
+
+**Problème :** Nginx `auth_request` n'envoie pas les paramètres de requête. Le token `?token=xxx` n'arrivait pas à verify.
+
+**Solution :** Les configs ont été corrigées avec `set $token $arg_token` et `proxy_pass .../verify?token=$token`.
+
+### 4. HTTPS : utiliser la config SSL
+
+Si tu utilises `https://app.zychadmeta.com`, dans `docker-compose.bot-only.yml` remplace `nginx-bot-only.conf` par `nginx-bot-only-ssl.conf` dans les volumes. Place les certificats dans `nginx/ssl/`.
+
+### 5. Déployer sur Hetzner
 
 ```bash
 ssh root@46.225.122.166
 cd ~/ZyChad-Meta
 git pull
 docker compose -f docker-compose.bot-only.yml up -d --build
-```
-
-### 4. Mettre à jour la config Nginx sur Hetzner
-
-Si tu as créé `nginx-bot-only.conf` à la main, ajoute cette ligne dans le bloc `location = /auth/verify` :
-
-```nginx
-proxy_set_header X-Original-Host $host;
-```
-
-Puis redémarre Nginx :
-
-```bash
 docker compose -f docker-compose.bot-only.yml restart nginx
 ```
+
+### 6. Vérifier le flux
+
+1. Va sur www.zychadmeta.com, connecte-toi
+2. Clique sur « Ouvrir le bot » dans le dashboard
+3. Tu dois être redirigé vers app.zychadmeta.com/?token=xxx
+4. Le bot doit s'afficher
 
 ---
 
