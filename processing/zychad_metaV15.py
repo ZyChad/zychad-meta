@@ -2756,18 +2756,6 @@ Ou envoyer un fichier → reçoit les variantes
 let poll,spoll;
 // SaaS: transmettre le token à toutes les requêtes API (Nginx auth_request)
 function apiUrl(u){const t=new URLSearchParams(location.search).get('token');return t?u+(u.includes('?')?'&':'?')+'token='+encodeURIComponent(t):u;}
-// Fetch + parse JSON avec gestion des erreurs (401, 403, body vide)
-async function apiJson(url,opts={}){
-  const r=await fetch(url,opts);
-  const text=await r.text();
-  if(!r.ok){
-    if(r.status===401){alert('Session expirée. Va sur le dashboard et clique à nouveau sur « Ouvrir le bot » pour obtenir un nouveau lien.');if(poll)clearInterval(poll);poll=null;return null;}
-    if(r.status===403){alert('Quota dépassé. Passe à un plan payant.');return null;}
-    throw new Error('Erreur '+r.status+(text?': '+text.slice(0,100):''));
-  }
-  if(!text||!text.trim())return null;
-  try{return JSON.parse(text);}catch(e){throw new Error('Réponse invalide: '+text.slice(0,80));}
-}
 
 /* Tabs */
 function stab(n){
@@ -2901,7 +2889,7 @@ function varNav(dir){
 
 /* Folder picker */
 async function pickFolder(targetId){
-  const r=await apiJson(apiUrl('/api/pick-folder?target='+targetId));
+  const r=await(await fetch(apiUrl('/api/pick-folder?target='+targetId))).json();
   if(r&&r.folder) document.getElementById(targetId).value=r.folder;
   else alert('En mode web, utilise le glisser-d\u00e9poser des fichiers dans la zone ci-dessus.');
 }
@@ -2928,7 +2916,7 @@ async function handleDrop(e){
       sent++;ok.textContent=sent+'/'+droppedFiles.length+' fichiers envoyés...';
       updateDroppedFileStatus(f.name,'ok');
     }
-    const data=await apiJson(apiUrl('/api/upload-done'));
+    const data=await(await fetch(apiUrl('/api/upload-done'))).json();
     if(!data||!data.folder){throw new Error('Impossible de récupérer le dossier');}
     document.getElementById('idir').value=data.folder;
     ok.textContent='✅ '+droppedFiles.length+' fichiers prêts';
@@ -3023,10 +3011,10 @@ document.getElementById('preview-zone').style.display='none';
 document.getElementById('pause-btn').innerHTML='⏸ Pause';
 document.getElementById('eta-display').textContent='';
 const d={input_dir:document.getElementById('idir').value,output_dir:document.getElementById('odir').value,variants:parseInt(document.getElementById('nv').value)||10,workers:parseInt(document.getElementById('nw').value)||4,rename:document.getElementById('rn').checked,double_process:document.getElementById('dbl').checked,stealth:document.getElementById('stealth').checked,naming_template:document.getElementById('ntpl')?document.getElementById('ntpl').value.trim():'',dest:destMode,gdrive_folder_id:document.getElementById('gd-folder-id')?document.getElementById('gd-folder-id').value.trim():'',tg_chat_id:document.getElementById('tg-chat-id')?document.getElementById('tg-chat-id').value.trim():'',tg_topic_id:document.getElementById('tg-topic-id')?document.getElementById('tg-topic-id').value.trim():''};
-const startR=await apiJson(apiUrl('/api/start'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});
-if(startR&&!startR.error){poll=setInterval(pp,400)}else{const b=document.getElementById('sb');if(b){b.disabled=false;b.innerHTML='Lancer le traitement';document.getElementById('pc').classList.remove('on');document.getElementById('proc-controls').classList.add('hide');}if(startR&&startR.error)alert(startR.error);}
+let startR;try{const res=await fetch(apiUrl('/api/start'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});if(!res.ok){if(res.status===401)alert('Session expirée. Va sur le dashboard et clique « Ouvrir le bot » pour un nouveau lien.');else if(res.status===403)alert('Quota dépassé.');else alert('Erreur '+res.status);startR={error:true}}else{startR=await res.json()}}catch(e){startR={error:true};alert('Erreur: '+e.message)}
+if(startR&&!startR.error){poll=setInterval(pp,400)}else{const b=document.getElementById('sb');if(b){b.disabled=false;b.innerHTML='Lancer le traitement';document.getElementById('pc').classList.remove('on');document.getElementById('proc-controls').classList.add('hide');}if(startR&&startR.error&&startR.error!==true)alert(startR.error)}
 
-async function pp(){let d;try{d=await apiJson(apiUrl('/api/progress'));}catch(e){if(poll)clearInterval(poll);poll=null;const b=document.getElementById('sb');if(b){b.disabled=false;b.innerHTML='Lancer le traitement';}alert('Erreur: '+e.message);return;}
+async function pp(){let d;try{d=await(await fetch(apiUrl('/api/progress'))).json();}catch(e){if(poll)clearInterval(poll);poll=null;const b=document.getElementById('sb');if(b){b.disabled=false;b.innerHTML='Lancer le traitement';}alert('Erreur: '+e.message);return;}
 if(!d)return;
 const p=d.total>0?(d.progress/d.total*100):0;document.getElementById('pf').style.width=p+'%';
 document.getElementById('ps').textContent=d.progress+' / '+d.total;document.getElementById('pt').textContent=d.file||'Traitement...';
@@ -3070,7 +3058,7 @@ async function genPreview(){
   document.getElementById('preview-btn').disabled=true;
   document.getElementById('preview-btn').innerHTML='⏳...';
   try{
-    const r=await apiJson(apiUrl('/api/preview'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({input_dir:idir})});
+    const r=await(await fetch(apiUrl('/api/preview'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({input_dir:idir})})).json();
     if(!r||r.error){alert(r&&r.error?r.error:'Erreur preview');return}
     const pz=document.getElementById('preview-zone');pz.style.display='block';
     const orig=document.getElementById('pv-orig');const vari=document.getElementById('pv-var');
@@ -3596,15 +3584,15 @@ class H(BaseHTTPRequestHandler):
         self._set_saas_user()
         path_only=self.path.split("?")[0]
         if path_only in["/","/index.html"]: self._html(HTML)
-        elif self.path=="/manifest.json":
+        elif path_only=="/manifest.json":
             m=json.dumps({"name":"ZyChad Meta","short_name":"ZyChad","start_url":"/","display":"standalone","background_color":"#0a0f1c","theme_color":"#0ea5c7","icons":[{"src":"/icon-192.png","sizes":"192x192","type":"image/png"}]})
             self.send_response(200)
             self.send_header("Content-Type","application/json")
             self.end_headers()
             self.wfile.write(m.encode())
             return
-        elif self.path=="/api/status": self._json({"ffmpeg":FFMPEG_PATH is not None,"fp":FFMPEG_PATH,"fi":ffmpeg_install_info()})
-        elif self.path=="/api/progress":
+        elif path_only=="/api/status": self._json({"ffmpeg":FFMPEG_PATH is not None,"fp":FFMPEG_PATH,"fi":ffmpeg_install_info()})
+        elif path_only=="/api/progress":
             import re as _re
             # Group results by original file
             preview_groups={}  # orig_name -> [variant_filenames]
@@ -3615,23 +3603,23 @@ class H(BaseHTTPRequestHandler):
             # Sort groups and variants
             preview_sorted=[{"orig":k,"variants":sorted(v)} for k,v in sorted(preview_groups.items())]
             self._json({"active":state["active"],"progress":state["progress"],"total":state["total"],"file":state["file"],"log":state["log"][-150:],"results":state["results"],"done":state["done"],"zip":state["zip"],"input":state.get("input",""),"preview":preview_sorted,"gdrive_uploading":gdrive_state.get("uploading",False),"gdrive_done":gdrive_state.get("done",False),"gdrive_error":gdrive_state.get("error",""),"tg_uploading":tg_send_state.get("uploading",False),"tg_done":tg_send_state.get("done",False),"tg_error":tg_send_state.get("error",""),"paused":state.get("paused",False),"cancelled":state.get("cancelled",False),"eta":state.get("eta",""),"queue":state.get("files_list",[])})
-        elif self.path=="/api/scrape-progress": self._json({"active":scrape_state["active"],"done":scrape_state["done"],"downloaded":scrape_state["downloaded"],"total":scrape_state["total"],"folder":scrape_state["folder"],"log":scrape_state["log"][-50:]})
-        elif self.path=="/api/tt-progress": self._json({"active":tt_state["active"],"done":tt_state["done"],"downloaded":tt_state["downloaded"],"total":tt_state["total"],"folder":tt_state["folder"],"log":tt_state["log"][-50:]})
-        elif self.path=="/api/config":
+        elif path_only=="/api/scrape-progress": self._json({"active":scrape_state["active"],"done":scrape_state["done"],"downloaded":scrape_state["downloaded"],"total":scrape_state["total"],"folder":scrape_state["folder"],"log":scrape_state["log"][-50:]})
+        elif path_only=="/api/tt-progress": self._json({"active":tt_state["active"],"done":tt_state["done"],"downloaded":tt_state["downloaded"],"total":tt_state["total"],"folder":tt_state["folder"],"log":tt_state["log"][-50:]})
+        elif path_only=="/api/config":
             cfg=load_config()
             uid=self.headers.get("X-User-Id")
             if uid:
                 us=load_user_settings(uid)
                 if us: cfg.update(us)
             self._json(cfg)
-        elif self.path=="/api/api-key": self._json({"key":get_api_key()})
-        elif self.path=="/api/api-key-regen":
+        elif path_only=="/api/api-key": self._json({"key":get_api_key()})
+        elif path_only=="/api/api-key-regen":
             key=generate_api_key(); save_config({"api_key":key}); self._json({"key":key})
-        elif self.path=="/api/tg-status":
+        elif path_only=="/api/tg-status":
             self._json({"active":tg_bot_state["active"],"username":tg_bot_state["username"],"error":tg_bot_state["error"]})
-        elif self.path=="/api/sim-status":
+        elif path_only=="/api/sim-status":
             self._json({"active":sim_state["active"],"result":sim_state["result"]})
-        elif self.path=="/api/dc-status":
+        elif path_only=="/api/dc-status":
             self._json({"active":dc_bot_state["active"],"username":dc_bot_state["username"],"error":dc_bot_state["error"]})
         # ── External API (requires X-API-Key) ──
         elif self.path=="/ext/status":
@@ -3663,14 +3651,14 @@ class H(BaseHTTPRequestHandler):
                 self.send_response(200); self.send_header("Content-Type",ct); self.send_header("Content-Disposition",f"attachment; filename={fname}"); self.send_header("Content-Length",str(fp.stat().st_size)); self.end_headers()
                 with open(fp,"rb") as f: self.wfile.write(f.read())
             else: self._json_err(404,"File not found")
-        elif self.path=="/api/gdrive-progress":
+        elif path_only=="/api/gdrive-progress":
             self._json(gdrive_state)
-        elif self.path=="/api/tg-send-progress":
+        elif path_only=="/api/tg-send-progress":
             self._json(tg_send_state)
-        elif self.path=="/api/pause":
+        elif path_only=="/api/pause":
             state["paused"]=not state.get("paused",False)
             self._json({"paused":state["paused"]})
-        elif self.path=="/api/cancel":
+        elif path_only=="/api/cancel":
             state["cancelled"]=True; state["paused"]=False
             self._json({"cancelled":True})
         elif self.path.startswith("/api/file"):
@@ -3693,8 +3681,8 @@ else{document.body.innerHTML='<h2 style="font-family:sans-serif;text-align:cente
 </script></body></html>"""
             self.send_response(200); self.send_header("Content-Type","text/html"); self.end_headers()
             self.wfile.write(html.encode())
-        elif self.path=="/api/stats": self._json(load_stats())
-        elif self.path=="/api/scheduler": self._json({"jobs":scheduler_jobs})
+        elif path_only=="/api/stats": self._json(load_stats())
+        elif path_only=="/api/scheduler": self._json({"jobs":scheduler_jobs})
         elif self.path.startswith("/api/original/"):
             # Serve original input file for preview comparison
             fname=self.path[len("/api/original/"):]
@@ -3747,7 +3735,7 @@ else{document.body.innerHTML='<h2 style="font-family:sans-serif;text-align:cente
         elif self.path.startswith("/api/upload-done"):
             # Return the temp upload folder path
             self._json({"folder":str(Path(tempfile.gettempdir())/"zychad_drop")})
-        elif self.path=="/api/download-zip":
+        elif path_only=="/api/download-zip":
             z=state.get("zip")
             if z and Path(z).exists():
                 zp=Path(z)
@@ -3762,7 +3750,7 @@ else{document.body.innerHTML='<h2 style="font-family:sans-serif;text-align:cente
                 self.send_header("Content-Type","text/html; charset=utf-8")
                 self.end_headers()
                 self.wfile.write(b"<html><body style='font-family:sans-serif;padding:2rem;text-align:center'><h2>Aucun ZIP disponible</h2><p>Lance un traitement et attends la fin pour t&eacute;l&eacute;charger le ZIP.</p><a href='/'>Retour</a></body></html>")
-        elif self.path=="/api/open-output":
+        elif path_only=="/api/open-output":
             o=state.get("output","")
             if o and Path(o).exists():
                 try:
@@ -3771,7 +3759,7 @@ else{document.body.innerHTML='<h2 style="font-family:sans-serif;text-align:cente
                     else: subprocess.run(["xdg-open",o])
                 except (FileNotFoundError, OSError): pass  # Headless/Docker: pas de gestionnaire de fichiers
             self._json({"ok":True})
-        elif self.path=="/api/open-zip":
+        elif path_only=="/api/open-zip":
             z=state.get("zip")
             if z and Path(z).exists():
                 try:
@@ -3783,7 +3771,8 @@ else{document.body.innerHTML='<h2 style="font-family:sans-serif;text-align:cente
         else: self.send_response(404); self.end_headers()
     def do_POST(self):
         self._set_saas_user()
-        if self.path=="/api/upload-file":
+        path_only=self.path.split("?")[0]
+        if path_only=="/api/upload-file":
             # Receive a single file via multipart-like simple upload
             cl=int(self.headers.get("Content-Length",0))
             fname=urllib.parse.unquote(self.headers.get("X-Filename","file"))
@@ -3793,13 +3782,13 @@ else{document.body.innerHTML='<h2 style="font-family:sans-serif;text-align:cente
             fp=drop_dir/fname
             with open(fp,"wb") as f: f.write(data)
             self._json({"ok":True,"path":str(fp)})
-        elif self.path=="/api/upload-clear":
+        elif path_only=="/api/upload-clear":
             # Clear temp drop folder for fresh drop
             drop_dir=Path(tempfile.gettempdir())/"zychad_drop"
             if drop_dir.exists(): shutil.rmtree(drop_dir)
             drop_dir.mkdir(parents=True,exist_ok=True)
             self._json({"ok":True})
-        elif self.path=="/api/scrape":
+        elif path_only=="/api/scrape":
             b=json.loads(self.rfile.read(int(self.headers.get("Content-Length",0))))
             if scrape_state["active"]: self._json({"error":"busy"}); return
             ak=b.get("api_key","").strip(); un=b.get("username","").strip(); mp=b.get("max_posts",50); sr=b.get("skip_reels",True)
@@ -3819,18 +3808,18 @@ else{document.body.innerHTML='<h2 style="font-family:sans-serif;text-align:cente
             else:
                 threading.Thread(target=run_scrape,args=(ak,usernames[0] if usernames else un,mp,sr,ob,df,ml),daemon=True).start()
             self._json({"ok":True})
-        elif self.path=="/api/gdrive-token":
+        elif path_only=="/api/gdrive-token":
             b=json.loads(self.rfile.read(int(self.headers.get("Content-Length",0))))
             gdrive_token["access_token"]=b.get("token","")
             self._json({"ok":True})
-        elif self.path=="/api/preview":
+        elif path_only=="/api/preview":
             b=json.loads(self.rfile.read(int(self.headers.get("Content-Length",0))))
             i=b.get("input_dir","")
             if not i: self._json({"error":"No input"}); return
             o=str(Path(i).parent/"_zychad_preview")
             r=run_preview(i,o)
             self._json(r)
-        elif self.path=="/api/save-config":
+        elif path_only=="/api/save-config":
             b=json.loads(self.rfile.read(int(self.headers.get("Content-Length",0))))
             uid=self.headers.get("X-User-Id")
             if uid and ("tg_dest_chat_id" in b or "tg_dest_topic_id" in b):
@@ -3838,16 +3827,16 @@ else{document.body.innerHTML='<h2 style="font-family:sans-serif;text-align:cente
                 b={k:v for k,v in b.items() if k not in ("tg_dest_chat_id","tg_dest_topic_id")}
             if b: save_config(b)
             self._json({"ok":True})
-        elif self.path=="/api/scheduler-add":
+        elif path_only=="/api/scheduler-add":
             b=json.loads(self.rfile.read(int(self.headers.get("Content-Length",0))))
             jid=scheduler_add(b); self._json({"ok":True,"id":jid})
-        elif self.path=="/api/scheduler-remove":
+        elif path_only=="/api/scheduler-remove":
             b=json.loads(self.rfile.read(int(self.headers.get("Content-Length",0))))
             scheduler_remove(b.get("id","")); self._json({"ok":True})
-        elif self.path=="/api/scheduler-toggle":
+        elif path_only=="/api/scheduler-toggle":
             b=json.loads(self.rfile.read(int(self.headers.get("Content-Length",0))))
             scheduler_toggle(b.get("id","")); self._json({"ok":True})
-        elif self.path=="/api/tg-connect":
+        elif path_only=="/api/tg-connect":
             b=json.loads(self.rfile.read(int(self.headers.get("Content-Length",0))))
             token=b.get("token","").strip(); nv=b.get("variants",5); mx=b.get("max_variants",50); auth=b.get("authorized",[])
             if not token: self._json({"error":"no token"}); return
@@ -3856,14 +3845,14 @@ else{document.body.innerHTML='<h2 style="font-family:sans-serif;text-align:cente
             tg_bot_start()
             time.sleep(2)
             self._json({"ok":True,"active":tg_bot_state["active"],"username":tg_bot_state["username"],"error":tg_bot_state["error"]})
-        elif self.path=="/api/tg-disconnect":
+        elif path_only=="/api/tg-disconnect":
             tg_bot_stop(); save_config({"tg_bot_token":""})
             self._json({"ok":True})
-        elif self.path=="/api/dc-start":
+        elif path_only=="/api/dc-start":
             dc_bot_start()
             time.sleep(2)
             self._json({"ok":True,"active":dc_bot_state["active"],"username":dc_bot_state["username"],"error":dc_bot_state["error"]})
-        elif self.path=="/api/sim-upload":
+        elif path_only=="/api/sim-upload":
             cl=int(self.headers.get("Content-Length",0))
             slot=self.headers.get("X-Slot","1")  # "1" or "2"
             fname=urllib.parse.unquote(self.headers.get("X-Filename","file"))
@@ -3877,7 +3866,7 @@ else{document.body.innerHTML='<h2 style="font-family:sans-serif;text-align:cente
                 except: pass
             with open(fp,"wb") as f: f.write(data)
             self._json({"ok":True,"path":str(fp),"slot":slot})
-        elif self.path=="/api/sim-check":
+        elif path_only=="/api/sim-check":
             sim_dir=Path(tempfile.gettempdir())/"zychad_sim"
             f1=list(sim_dir.glob("file1_*")) if sim_dir.exists() else []
             f2=list(sim_dir.glob("file2_*")) if sim_dir.exists() else []
@@ -3885,7 +3874,7 @@ else{document.body.innerHTML='<h2 style="font-family:sans-serif;text-align:cente
             if sim_state["active"]: self._json({"error":"Analyse en cours..."}); return
             threading.Thread(target=run_similarity,args=(str(f1[0]),str(f2[0])),daemon=True).start()
             self._json({"ok":True})
-        elif self.path=="/api/sim-batch":
+        elif path_only=="/api/sim-batch":
             b=json.loads(self.rfile.read(int(self.headers.get("Content-Length",0))))
             orig=b.get("original","").strip(); vdir=b.get("variants_dir","").strip()
             if not orig or not vdir: self._json({"error":"Need original + variants_dir"}); return
@@ -3900,19 +3889,19 @@ else{document.body.innerHTML='<h2 style="font-family:sans-serif;text-align:cente
                     sim_state.update(active=False,result={"error":str(e)})
             threading.Thread(target=_batch,daemon=True).start()
             self._json({"ok":True})
-        elif self.path=="/api/watermark-embed":
+        elif path_only=="/api/watermark-embed":
             b=json.loads(self.rfile.read(int(self.headers.get("Content-Length",0))))
             img=b.get("image","").strip(); msg=b.get("message","").strip(); outp=b.get("output","")
             if not img or not msg: self._json({"error":"Need image + message"}); return
             r=lsb_embed(img,msg,outp if outp else None)
             self._json(r)
-        elif self.path=="/api/watermark-read":
+        elif path_only=="/api/watermark-read":
             b=json.loads(self.rfile.read(int(self.headers.get("Content-Length",0))))
             img=b.get("image","").strip()
             if not img: self._json({"error":"Need image path"}); return
             r=lsb_extract(img)
             self._json(r)
-        elif self.path=="/api/tt-scrape":
+        elif path_only=="/api/tt-scrape":
             b=json.loads(self.rfile.read(int(self.headers.get("Content-Length",0))))
             if tt_state["active"]: self._json({"error":"busy"}); return
             ak=b.get("api_key","").strip(); un=b.get("username","").strip(); mv=b.get("max_videos",50)
@@ -3920,7 +3909,7 @@ else{document.body.innerHTML='<h2 style="font-family:sans-serif;text-align:cente
             ob=b.get("output_base","").strip() or str(Path.home()/"Downloads"/"zychad_scrape")
             threading.Thread(target=run_tt_scrape,args=(ak,un,mv,ob),daemon=True).start()
             self._json({"ok":True})
-        elif self.path=="/api/start":
+        elif path_only=="/api/start":
             b=json.loads(self.rfile.read(int(self.headers.get("Content-Length",0))))
             if state["active"]: self._json({"error":"busy"}); return
             i=b.get("input_dir","").strip(); o=b.get("output_dir","").strip()
