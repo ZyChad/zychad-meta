@@ -14,7 +14,7 @@ services:
     image: nginx:alpine
     ports: ["80:80", "443:443"]
     volumes:
-      - ./nginx/nginx-bot-only.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/nginx-bot-only-ssl.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/ssl:/etc/nginx/ssl:ro
     depends_on: [bot]
     restart: always
