@@ -2271,7 +2271,8 @@ body.light .tag{border-color:var(--br);color:var(--dim)}
 <div class="c">
 <div class="sl">Configuration</div>
 <div class="fl"><label>Dossier source</label>
-<div id="dropzone" style="border:2px dashed var(--br);border-radius:10px;padding:20px;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:6px" onclick="pickFolder('idir')" ondragover="event.preventDefault();this.style.borderColor='var(--teal)';this.style.background='rgba(14,165,199,.05)'" ondragleave="this.style.borderColor='var(--br)';this.style.background='none'" ondrop="handleDrop(event)">
+<div id="dropzone" style="border:2px dashed var(--br);border-radius:10px;padding:20px;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:6px" onclick="if(new URLSearchParams(location.search).get('token')){document.getElementById('file-input').click()}else{pickFolder('idir')}" ondragover="event.preventDefault();this.style.borderColor='var(--teal)';this.style.background='rgba(14,165,199,.05)'" ondragleave="this.style.borderColor='var(--br)';this.style.background='none'" ondrop="handleDrop(event)">
+<input type="file" id="file-input" multiple accept=".mp4,.mov,.avi,.mkv,.webm,.jpg,.jpeg,.png,.webp,.gif,.bmp" style="display:none" onchange="if(this.files.length){handleDrop({preventDefault:()=>{},dataTransfer:{files:this.files}});this.value=''}">
 <div id="dz-text" style="color:var(--mut);font-size:12px">
 <div style="font-size:28px;margin-bottom:8px;opacity:.5">📂</div>
 Glisse tes fichiers ici ou clique pour parcourir<br>
@@ -2760,7 +2761,7 @@ async function apiJson(url,opts={}){
   const r=await fetch(url,opts);
   const text=await r.text();
   if(!r.ok){
-    if(r.status===401){alert('Session expirée. Rafraîchis la page depuis le dashboard.');if(poll)clearInterval(poll);poll=null;location.href='https://www.zychadmeta.com/dashboard';return null;}
+    if(r.status===401){alert('Session expirée. Va sur le dashboard et clique à nouveau sur « Ouvrir le bot » pour obtenir un nouveau lien.');if(poll)clearInterval(poll);poll=null;return null;}
     if(r.status===403){alert('Quota dépassé. Passe à un plan payant.');return null;}
     throw new Error('Erreur '+r.status+(text?': '+text.slice(0,100):''));
   }
@@ -2917,18 +2918,26 @@ async function handleDrop(e){
   showDroppedFiles();
   document.getElementById('dz-text').style.display='none';
   const ok=document.getElementById('dz-ok');ok.style.display='block';ok.textContent='Envoi de '+files.length+' fichiers...';
-  // Clear temp folder first
-  await fetch(apiUrl('/api/upload-clear'),{method:'POST'});
-  let sent=0;
-  for(const f of droppedFiles){
-    await fetch(apiUrl('/api/upload-file'),{method:'POST',headers:{'X-Filename':encodeURIComponent(f.name),'Content-Length':f.size},body:f});
-    sent++;ok.textContent=sent+'/'+droppedFiles.length+' fichiers envoyés...';
-    updateDroppedFileStatus(f.name,'ok');
+  try{
+    let r=await fetch(apiUrl('/api/upload-clear'),{method:'POST'});
+    if(!r.ok){throw new Error('Erreur '+(r.status===401?'session expirée — rafraîchis depuis le dashboard':r.status));}
+    let sent=0;
+    for(const f of droppedFiles){
+      r=await fetch(apiUrl('/api/upload-file'),{method:'POST',headers:{'X-Filename':encodeURIComponent(f.name),'Content-Length':f.size},body:f});
+      if(!r.ok){throw new Error('Erreur upload '+(r.status===401?'session expirée':r.status));}
+      sent++;ok.textContent=sent+'/'+droppedFiles.length+' fichiers envoyés...';
+      updateDroppedFileStatus(f.name,'ok');
+    }
+    const data=await apiJson(apiUrl('/api/upload-done'));
+    if(!data||!data.folder){throw new Error('Impossible de récupérer le dossier');}
+    document.getElementById('idir').value=data.folder;
+    ok.textContent='✅ '+droppedFiles.length+' fichiers prêts';
+    dz.style.borderColor='var(--grn)';
+  }catch(err){
+    ok.textContent='❌ Erreur';
+    dz.style.borderColor='var(--red)';
+    alert(err.message||'Erreur lors de l\'envoi des fichiers.');
   }
-  const r=await(await fetch(apiUrl('/api/upload-done'))).json();
-  document.getElementById('idir').value=r.folder;
-  ok.textContent='✅ '+droppedFiles.length+' fichiers prêts';
-  dz.style.borderColor='var(--grn)';
   setTimeout(()=>{dz.style.borderColor='var(--br)';dz.style.background='none'},2000);
 }
 function showDroppedFiles(){
